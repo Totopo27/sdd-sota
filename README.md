@@ -11,11 +11,14 @@ Literature Review tools for Master's Thesis in Electrical Engineering at Univers
 
 ## Setup
 
-This project uses `pyproject.toml` for dependency management. You can install it in editable mode:
+This project uses `pyproject.toml` for dependency management with [`uv`](https://docs.astral.sh/uv/) as the package manager.
 
 ```bash
-pip install -e .
+uv sync          # Install dependencies and create uv.lock
+uv run python scripts/run_analysis.py --config config.yaml
 ```
+
+`uv sync` resolves dependencies and writes `uv.lock` for reproducible builds. Use `uv run` to execute scripts with the project's environment.
 
 ## Usage
 
@@ -24,14 +27,14 @@ To process data and run the zero-shot classification:
 
 **Using local CSVs:**
 ```bash
-python scripts/run_analysis.py --config config.yaml
+uv run python scripts/run_analysis.py --config config.yaml
 ```
 
 **Using Zotero Library:**
 1. Configure your Zotero credentials in `config.yaml`.
 2. Run:
 ```bash
-python scripts/run_analysis.py --config config.yaml --fetch-zotero
+uv run python scripts/run_analysis.py --config config.yaml --fetch-zotero
 ```
 
 *Note: Classification requires a GPU and may take significant time.*
@@ -40,16 +43,9 @@ python scripts/run_analysis.py --config config.yaml --fetch-zotero
 To generate visualizations and filter the classified data:
 
 ```bash
-python scripts/run_plots.py --config config.yaml
+uv run python scripts/run_plots.py --config config.yaml
 ```
 
 ## Dependencies
 
-- pandas
-- numpy
-- matplotlib
-- transformers
-- torch
-- datasets
-- pyzotero
-- PyYAML
+Defined in `pyproject.toml` and resolved by `uv`. See `uv.lock` for exact pinned versions.

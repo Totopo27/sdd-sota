@@ -1,3 +1,12 @@
+.claude/
+CLAUDE.local.md           # Local-only Claude instructions
+CLAUDE.md
+.mcp.json
+# Cursor, Copilot, and other AI tools
+.cursor/
+.cursorrules.local
+.context
+
 # Data and Results
 data/processed/
 results/plots/

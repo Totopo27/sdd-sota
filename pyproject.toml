@@ -32,3 +32,8 @@ dependencies = [
 [project.scripts]
 litreview-analysis = "scripts.run_analysis:main"
 litreview-plots = "scripts.run_plots:main"
+
+[tool.uv]
+# uv is the package manager for this project.
+# Use `uv sync` to install dependencies (creates/updates uv.lock).
+# Use `uv run <script>` to run scripts with the project's dependencies.
