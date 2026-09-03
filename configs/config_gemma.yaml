@@ -1,0 +1,63 @@
+# LitReview Configuration — tuned for sentence-transformers/all-MiniLM-L6-v2
+# 384-dim embeddings; n_neighbors=15 gives stable UMAP reduction on
+# typical corpus sizes (50+ papers).
+
+zotero:
+  library_type: "user"
+  collection_names:
+   - "Monografia-Web-of-Science"
+   #- "Monografia-Google-Scholar"
+   #- "Monografia-Scopus"
+   #- "Monografia-IEEE"
+
+  # library_id and api_key are loaded from .env (ZOTERO_LIBRARY_ID, ZOTERO_API_KEY)
+
+bertopic:
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  min_topic_size: 1
+  seed_topics: []
+  # Seed words auto-extracted from candidate_labels values above.
+  # To override explicitly, add:  seed_words: ["word1", "word2"]
+  umap_kwargs:
+    n_neighbors:  5        # higher for 768-dim embeddings
+    n_components: 16
+    min_dist: 0.0
+    metric: cosine
+  hdbscan_kwargs:
+    min_samples: 5         # must be <= min_topic_size
+    algorithm: best     # avoids KDTree crash on small datasets
+
+zeroshot:
+  models:
+    - "facebook/bart-large-mnli"
+    - "MoritzLaurer/bge-m3-zeroshot-v2.0-c"
+  batch_size: 32
+  threshold: 0.5
+  candidate_labels:
+    BLT: "bedload transport"
+    MB: "mobile bed"
+    HPC: "high performance computing enabled"
+    GPU: "gpu accelerated"
+    MPI: "distributed memory"
+    CPU: "cpu multithreading"
+    "2D": "two dimensional"
+    "1D": "one dimensional"
+    DET: "deterministic"
+    STC: "stochastic"
+    FVM: "finite volume method"
+    FEM: "finite element method"
+    FDM: "finite difference method"
+    NMD: "numerical method development"
+    RBM: "riverbed morphology"
+    GHM: "hydrological modeling"
+    OM: "ocean modeling"
+    CPR: "computational performance report"
+    VNM: "validation of numerical method"
+    IBER: "iber"
+    TELEMAC: "telemac"
+    HEC-RAS: "hec-ras"
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  plots: "results/plots"

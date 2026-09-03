@@ -3,13 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["litreview*"]
-exclude = ["data*", "results*"]
+where = ["src"]
 
 [project]
 name = "litreview"
-version = "0.1.0"
+version = "0.2.0"
+requires-python = ">=3.12"
 description = "A library for literature review paper analysis and visualization"
 authors = [
     { name = "Johansell Villalobos" }
@@ -23,17 +22,75 @@ dependencies = [
     "numpy",
     "matplotlib",
     "transformers",
-    "torch",
     "datasets",
     "PyYAML",
     "pyzotero",
+    "python-dotenv",
+    "bertopic",
+    "sentence-transformers",
+    "umap-learn",
+    "hdbscan",
+    "pyarrow<21.0.0",  # 21.0.0 removed PyExtensionType (renamed to ExtensionType), breaking datasets
+    "nltk",
 ]
 
 [project.scripts]
-litreview-analysis = "scripts.run_analysis:main"
-litreview-plots = "scripts.run_plots:main"
+litreview-analysis = "litreview.cli.run_analysis:main"
+litreview-plots = "litreview.cli.run_plots:main"
+
+[project.optional-dependencies]
+# GPU: CUDA 12.6 — install with:
+#   uv sync --extra cu126
+cu126 = [
+    "torch >= 2.6.0",
+    "torchvision",
+    "torchaudio",
+]
+# GPU: CUDA 12.4 — install with:
+#   uv sync --extra cu124
+cu124 = [
+    "torch >= 2.6.0",
+    "torchvision",
+    "torchaudio",
+]
+# CPU-only
+cpu = [
+    "torch >= 2.6.0",
+    "torchvision",
+    "torchaudio",
+]
+dev = ["pytest", "ruff"]
+
+[dependency-group.test]
+dependencies = ["pytest"]
 
 [tool.uv]
 # uv is the package manager for this project.
-# Use `uv sync` to install dependencies (creates/updates uv.lock).
-# Use `uv run <script>` to run scripts with the project's dependencies.
+#
+# Install with CUDA 12.6 GPU support:
+#   uv sync --extra cu126
+#
+# Install with CUDA 12.4 GPU support:
+#   uv sync --extra cu124
+#
+# Install CPU-only:
+#   uv sync --extra cpu
+#
+# Run scripts:
+#   uv run litreview-analysis --config configs/config.yaml --fetch-zotero --plots results/plots/
+
+# Complementary index — PyTorch publishes CUDA wheels on a separate index.
+# complementary = true means uv still resolves common deps from PyPI
+# but looks up torch/torchvision/torchaudio on the PyTorch index.
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = false
+default-index = false
+complementary = true
+
+# Route torch packages to the PyTorch CUDA 12.6 index.
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+torchvision = { index = "pytorch-cu126" }
+torchaudio = { index = "pytorch-cu126" }

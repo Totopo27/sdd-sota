@@ -1,0 +1,52 @@
+# LitReview Configuration
+
+zotero:
+  library_type: "user"
+  collection_names: 
+   - "Monografia-Web-of-Science"
+   - "Monografia-Google-Scholar"
+   - "Monografia-Scopus"
+   - "Monografia-IEEE"
+
+  # library_id and api_key are loaded from .env (ZOTERO_LIBRARY_ID, ZOTERO_API_KEY)
+
+bertopic:
+  embedding_model: "all-mpnet-base-v2"
+  min_topic_size: 10
+  seed_topics: []
+  # seed_topics example: [["deep learning"], ["optimization"], ["reinforcement learning"]]
+
+zeroshot:
+  models:
+    - "facebook/bart-large-mnli"
+    - "MoritzLaurer/bge-m3-zeroshot-v2.0-c"
+  batch_size: 32
+  threshold: 0.5
+  candidate_labels:
+    BLT: "bedload transport"
+    MB: "mobile bed"
+    HPC: "high performance computing enabled"
+    GPU: "gpu accelerated"
+    MPI: "distributed memory"
+    CPU: "cpu multithreading"
+    "2D": "two dimensional"
+    "1D": "one dimensional"
+    DET: "deterministic"
+    STC: "stochastic"
+    FVM: "finite volume method"
+    FEM: "finite element method"
+    FDM: "finite difference method"
+    NMD: "numerical method development"
+    RBM: "riverbed morphology"
+    GHM: "hydrological modeling"
+    OM: "ocean modeling"
+    CPR: "computational performance report"
+    VNM: "validation of numerical method"
+    IBER: "iber"
+    TELEMAC: "telemac"
+    HEC-RAS: "hec-ras"
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  plots: "results/plots"

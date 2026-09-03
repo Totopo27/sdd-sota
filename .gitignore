@@ -12,6 +12,8 @@ data/processed/
 results/plots/
 *.png
 *.csv
+*.slurm
+*.log
 
 # Python
 __pycache__/
@@ -155,6 +157,9 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+**/*.csv
+data
 
 # Pyre type checker
 .pyre/
