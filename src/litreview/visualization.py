@@ -244,6 +244,26 @@ def plot_year_distribution(df: pd.DataFrame, path: str) -> None:
     plt.close(fig)
 
 
+def plot_source_distribution(df: pd.DataFrame, path: str) -> None:
+    """Plot publication source (journal/conference) distribution bar chart."""
+    sources = df["Source"].dropna().drop_duplicates()
+    if len(sources) == 0:
+        return
+
+    source_counts = sources.value_counts()
+    if len(source_counts) == 0:
+        return
+
+    fig, ax = plt.subplots(figsize=(max(8, len(source_counts) * 0.5),
+                                     max(4, min(len(source_counts), 15) * 0.4)))
+    source_counts.plot(kind="barh", ax=ax, color="steelblue")
+    ax.set_xlabel("Number of Papers")
+    ax.set_title("Publication Source Distribution")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+
+
 def plot_topic_coverage(coverage: dict, path: str) -> None:
     """Plot papers per topic bar chart."""
     topic_sizes = _normalize_topic_sizes(coverage.get("topic_sizes", {}))
