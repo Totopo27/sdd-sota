@@ -59,7 +59,7 @@ cpu = [
     "torchvision",
     "torchaudio",
 ]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "ruff", "jupyter", "nbconvert"]
 
 [dependency-group.test]
 dependencies = ["pytest"]
