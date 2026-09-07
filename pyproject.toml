@@ -32,11 +32,13 @@ dependencies = [
     "hdbscan",
     "pyarrow<21.0.0",  # 21.0.0 removed PyExtensionType (renamed to ExtensionType), breaking datasets
     "nltk",
+    "ipykernel>=6.0.0",
 ]
 
 [project.scripts]
 litreview-analysis = "litreview.cli.run_analysis:main"
 litreview-plots = "litreview.cli.run_plots:main"
+litreview-add-kernel = "litreview._kernel:install_kernel"
 
 [project.optional-dependencies]
 # GPU: CUDA 12.6 — install with:
@@ -82,6 +84,7 @@ dependencies = ["pytest"]
 # Complementary index — PyTorch publishes CUDA wheels on a separate index.
 # complementary = true means uv still resolves common deps from PyPI
 # but looks up torch/torchvision/torchaudio on the PyTorch index.
+
 [[tool.uv.index]]
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
