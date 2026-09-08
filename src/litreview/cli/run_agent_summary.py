@@ -1,4 +1,4 @@
-﻿"""CLI entry point for SDD Agent / headless research summary.
+"""CLI entry point for SDD Agent / headless research summary.
 
 Designed for AI Coding Agents (such as Pi / gentle-pi / sdd-sota).
 Executes the literature review pipeline and outputs structured JSON
@@ -55,6 +55,11 @@ def main():
         "--no-plots",
         action="store_true",
         help="Skip plot generation to speed up headless execution",
+    )
+    parser.add_argument(
+        "--skip-network",
+        action="store_true",
+        help="Skip Semantic Scholar citation graph analysis",
     )
     args = parser.parse_args()
 
@@ -140,7 +145,21 @@ def main():
         },
     }
 
-    # 7. Write output JSON
+    # 7. Build Citation Network (Semantic Scholar / S2AG)
+    if not args.skip_network and report.df is not None and len(report.df) > 0:
+        try:
+            from litreview.network import CitationGraphBuilder, plot_citation_network
+            graph_builder = CitationGraphBuilder().build_from_dataframe(report.df)
+            summary_data["citation_network"] = graph_builder.summary()
+            if not args.no_plots and args.plots_dir:
+                network_plot_path = os.path.join(args.plots_dir, "citation_network.png")
+                plot_citation_network(graph_builder, network_plot_path)
+                summary_data["artifacts"]["citation_network_plot"] = network_plot_path
+        except Exception as e:
+            print(f"Warning: Citation network analysis skipped/failed: {e}", file=sys.stderr)
+            summary_data["citation_network"] = {"status": "unavailable", "reason": str(e)}
+
+    # 8. Write output JSON
     os.makedirs(os.path.dirname(args.output_json) or ".", exist_ok=True)
     with open(args.output_json, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2, default=str)

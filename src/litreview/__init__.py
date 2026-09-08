@@ -31,6 +31,11 @@ from litreview.visualization import (
     plot_topic_label_distribution,
     plot_topic_distribution_by_year,
 )
+from litreview.network import (
+    SemanticScholarClient,
+    CitationGraphBuilder,
+    plot_citation_network,
+)
 
 __all__ = [
     "__version__",
@@ -41,6 +46,8 @@ __all__ = [
     "PipelineConfig",
     "BERTopicAnalyzer",
     "ZeroShotAnalyzer",
+    "SemanticScholarClient",
+    "CitationGraphBuilder",
     "compute_corpus_stats",
     "compute_topic_coverage",
     "compute_gap_analysis",
@@ -61,4 +68,5 @@ __all__ = [
     "plot_topic_network",
     "plot_topic_label_distribution",
     "plot_topic_distribution_by_year",
+    "plot_citation_network",
 ]

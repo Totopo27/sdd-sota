@@ -1,4 +1,4 @@
-﻿# litreview · Motor de Análisis Bibliográfico y Estado del Arte (SOTA)
+# litreview · Motor de Análisis Bibliográfico y Estado del Arte (SOTA)
 
 Motor analítico para **Revisión Sistemática de Literatura (SLR)** asistida por Machine Learning:
 - Ingesta de colecciones curadas desde **Zotero** o archivos **CSV locales**.
@@ -98,6 +98,32 @@ El agente recibe un JSON con la siguiente estructura lista para alimentar fases 
       }
     ],
     "num_gaps": 1
+  },
+  "citation_network": {
+    "total_nodes": 31,
+    "total_edges": 19,
+    "corpus_papers_modeled": 12,
+    "foundational_papers": [
+      {
+        "title": "Visual Transformers: Token-based Image Representation...",
+        "year": 2020,
+        "in_corpus": false,
+        "pagerank": 0.0328,
+        "internal_citations_received": 1,
+        "total_citations": 1240,
+        "influential_citations": 120
+      }
+    ],
+    "derivative_works": [
+      {
+        "title": "data imbalance mitigation in medical chest x ray datasets",
+        "year": 2021,
+        "in_corpus": true,
+        "references_cited_count": 19,
+        "total_citations": 84
+      }
+    ],
+    "bibliographic_coupling": []
   }
 }
 ```

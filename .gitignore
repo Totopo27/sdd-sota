@@ -3,6 +3,7 @@
 .hf-cache/
 data/raw/
 data/processed/
+data/cache/
 results/
 .env
 *.env
