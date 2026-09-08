@@ -1,7 +1,7 @@
 """Tests for analyzers module."""
 
 from litreview.analyzers.base import Analyzer
-from litreview.analyzers.bertopic import BERTopicAnalyzer
+from litreview.analyzers import BERTopicAnalyzer
 from litreview.analyzers.zeroshot import ZeroShotAnalyzer
 
 
@@ -54,10 +54,12 @@ class TestBERTopicAnalyzer:
         assert enriched == texts.tolist()
 
     def test_fit_transform(self, sample_df):
-        """Test that fit_transform returns a DataFrame with topic assignments."""
+        """Test that fit_transform and results return topic assignments."""
         analyzer = BERTopicAnalyzer(min_topic_size=1)
         abstracts = sample_df["Abstract Note"].dropna()
-        results = analyzer.fit_transform(abstracts)
+        df_out = analyzer.fit_transform(abstracts)
+        assert len(df_out) == len(abstracts)
+        results = analyzer.results
         assert isinstance(results, dict)
         assert "topic_assignments" in results
         assert "topic_sizes" in results
@@ -68,7 +70,7 @@ class TestBERTopicAnalyzer:
         assert results["num_topics"] >= 0
 
     def test_results(self, sample_df):
-        """Test that results property returns the same as fit_transform."""
+        """Test that results property returns analysis dict."""
         analyzer = BERTopicAnalyzer(min_topic_size=1)
         abstracts = sample_df["Abstract Note"].dropna()
         analyzer.fit_transform(abstracts)
@@ -97,8 +99,10 @@ class TestZeroShotAnalyzer:
             threshold=0.5,
             candidate_labels={"A": "test label"},
         )
-        abstracts = sample_df["abstract"].dropna().head(5)
-        results = analyzer.fit_transform(abstracts)
+        abstracts = sample_df["Abstract Note"].dropna().head(5)
+        df_out = analyzer.fit_transform(abstracts)
+        assert len(df_out) == len(abstracts)
+        results = analyzer.results
         assert isinstance(results, dict)
         assert "classifications" in results
         assert "label_counts" in results
@@ -112,7 +116,7 @@ class TestZeroShotAnalyzer:
             threshold=0.5,
             candidate_labels={"A": "test label"},
         )
-        abstracts = sample_df["abstract"].dropna().head(5)
+        abstracts = sample_df["Abstract Note"].dropna().head(5)
         analyzer.fit_transform(abstracts)
         results = analyzer.results
         assert "classifications" in results

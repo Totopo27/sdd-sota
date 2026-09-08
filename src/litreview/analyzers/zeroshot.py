@@ -15,10 +15,20 @@ class ZeroShotAnalyzer(Analyzer):
     classification. Supports multiple models and configurable thresholds.
     """
 
-    def __init__(self, config: ZeroShotConfig):
+    def __init__(self, config: ZeroShotConfig | None = None, **kwargs):
+        if config is None:
+            config = ZeroShotConfig(**kwargs)
         self.config = config
         self._pipeline = None
         self._results: pd.DataFrame | None = None
+
+    @property
+    def models(self) -> list[str]:
+        return self.config.models
+
+    @property
+    def threshold(self) -> float:
+        return self.config.threshold
 
     def fit(self, texts: pd.Series) -> "ZeroShotAnalyzer":
         """Initialize zero-shot classification pipeline.

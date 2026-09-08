@@ -169,22 +169,25 @@ class BERTopicFitter:
 
         num_samples = len(valid_texts)
 
-        # Prevent UMAP n_neighbors from exceeding sample size
+        # Prevent UMAP n_neighbors and n_components from exceeding sample size
         n_neighbors = min(5, max(2, num_samples - 1))
-        n_components = min(5, max(2, num_samples - 1))
+        n_components = min(5, max(1, num_samples - 2)) if num_samples > 3 else 1
+        init_mode = "random" if num_samples < 15 else "spectral"
 
         # Safe defaults for UMAP
         umap_kwargs = dict(
             n_neighbors=n_neighbors,
             n_components=n_components,
+            init=init_mode,
             min_dist=0.0,
             metric="cosine",
             **self.config.umap_kwargs,
         )
 
-        # Set safe defaults for HDBSCAN
+        # Set safe defaults for HDBSCAN (prediction_data=True is required for .transform())
         hdbscan_kwargs = dict(
             min_samples=min(1, max(1, num_samples - 1)),
+            prediction_data=True,
             **self.config.hdbscan_kwargs,
         )
 

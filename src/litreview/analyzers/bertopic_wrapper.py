@@ -39,7 +39,7 @@ class BERTopicAnalyzer(Analyzer):
     Supports seed topics to guide discovery toward user-defined themes.
     """
 
-    def __init__(self, config: BERTopicConfig):
+    def __init__(self, config: BERTopicConfig | None = None, **kwargs):
         warnings.warn(
             "BERTopicAnalyzer is deprecated. "
             "Use BERTopicFitter + TopicDistributionAnalyzer from "
@@ -47,6 +47,8 @@ class BERTopicAnalyzer(Analyzer):
             DeprecationWarning,
             stacklevel=2,
         )
+        if config is None:
+            config = BERTopicConfig(**kwargs)
         self.config = config
         self._fitter = BERTopicFitter(config)
         self._dist_analyzer = None
@@ -54,6 +56,14 @@ class BERTopicAnalyzer(Analyzer):
         self._reps_extractor = None
         self._topics: np.ndarray | None = None
         self._topic_probs: np.ndarray | None = None
+
+    def _build_enriched_texts(self, texts: pd.Series) -> list[str]:
+        """Prepend candidate labels to texts for domain-specific context."""
+        labels = list(self.config.candidate_labels.values())
+        if not labels:
+            return texts.tolist()
+        label_prefix = " | ".join(labels)
+        return [f"{label_prefix}: {text}" for text in texts.tolist()]
 
     def fit(self, texts: pd.Series) -> "BERTopicAnalyzer":
         """Fit BERTopic on texts.

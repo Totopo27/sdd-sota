@@ -147,11 +147,25 @@ class PipelineConfig:
     @classmethod
     def from_file(cls, path: str | Path = "config.yaml") -> "PipelineConfig":
         with open(path) as f:
-            cfg = yaml.safe_load(f)
+            cfg = yaml.safe_load(f) or {}
+
+        top_labels = cfg.get("labels", {})
+        top_models = cfg.get("models", [])
+
+        bertopic_dict = dict(cfg.get("bertopic", {}))
+        if "candidate_labels" not in bertopic_dict and top_labels:
+            bertopic_dict["candidate_labels"] = top_labels
+
+        zeroshot_dict = dict(cfg.get("zeroshot", {}))
+        if "candidate_labels" not in zeroshot_dict and top_labels:
+            zeroshot_dict["candidate_labels"] = top_labels
+        if "models" not in zeroshot_dict and top_models:
+            zeroshot_dict["models"] = top_models
+
         return cls(
             zotero=ZoteroConfig.from_config(cfg.get("zotero", {})),
-            bertopic=BERTopicConfig.from_config(cfg.get("bertopic", {})),
-            zeroshot=ZeroShotConfig.from_config(cfg.get("zeroshot", {})),
+            bertopic=BERTopicConfig.from_config(bertopic_dict),
+            zeroshot=ZeroShotConfig.from_config(zeroshot_dict),
             paths=cfg.get("paths", {}),
         )
 

@@ -103,8 +103,13 @@ paths:
 """
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(content)
-        yield f.name
-    os.unlink(f.name)
+        f.flush()
+        temp_name = f.name
+    try:
+        yield temp_name
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 
 @pytest.fixture
