@@ -1,135 +1,115 @@
-# litreview
+﻿# litreview · Motor de Análisis Bibliográfico y Estado del Arte (SOTA)
 
-Literature Review tools for Master's Thesis in Electrical Engineering at University of Costa Rica.
+Motor analítico para **Revisión Sistemática de Literatura (SLR)** asistida por Machine Learning:
+- Ingesta de colecciones curadas desde **Zotero** o archivos **CSV locales**.
+- Descubrimiento de tópicos no supervisados mediante **BERTopic** (SentenceTransformers + UMAP + HDBSCAN + c-TF-IDF).
+- Validación y clasificación taxonómica mediante **Zero-Shot NLI** (DeBERTa-v3 / BART).
+- Detección cuantitativa de vacíos de investigación (**Gap Analysis**).
+- Exportación estructurada en **JSON** para agentes de IA (**`sdd-sota`** en `gentle-pi`) y gráficos para papers científicos.
 
-A structured Python package for corpus exploration: fetch papers from Zotero, discover topics with BERTopic, validate with zero-shot classification, and generate statistics and visualizations.
+---
 
-## Project Structure
+## 🔐 Configuración de Seguridad: Zotero API Key
 
+Para conectar tu biblioteca de Zotero aplicando el **Principio de Mínimo Privilegio (*Least Privilege*)**:
+
+1. Ingresá a [zotero.org/settings/keys/new](https://www.zotero.org/settings/keys/new).
+2. Configurá los permisos estrictamente de la siguiente manera:
+   - **Key Description**: `pi-sdd-sota` *(o el nombre que prefieras)*.
+   - **Personal Library**:
+     - `[X] Allow library access` ➔ **MARCADO (Checked)**. *(Lectura de papers y abstracts)*.
+     - `[ ] Allow notes access` ➔ **DESMARCADO (Unchecked)**. *(No requerido; el abstract es metadato del paper)*.
+     - `[ ] Allow write access` ➔ **DESMARCADO (Unchecked)**. *(Estricto: el motor nunca modifica tu biblioteca)*.
+   - **Default Group Permissions**:
+     - `None` (si la colección es personal) o `Read Only` (si es un grupo compartido con colegas). **Nunca Read/Write**.
+3. Guardá la clave y anotá dos valores:
+   - **User ID**: El número de 7 u 8 dígitos que aparece arriba (*"Your userID for use in API calls is XXXXXXX"*).
+   - **API Key**: El token alfanumérico generado.
+
+Configurá tu archivo `.env` en la raíz del proyecto:
+```bash
+ZOTERO_LIBRARY_ID="1234567"
+ZOTERO_API_KEY="tu_token_alfanumerico"
+ZOTERO_LIBRARY_TYPE="user" # o "group"
 ```
-litreview/
-├── src/litreview/          — Core Python package (src-layout)
-│   ├── fetchers/           — Data fetchers (Zotero)
-│   ├── analyzers/          — Topic modeling & zero-shot classification
-│   ├── cli/                 — CLI entry points
-│   ├── pipeline.py         — ReviewPipeline orchestrator
-│   ├── statistics.py       — Corpus statistics & gap analysis
-│   ├── visualization.py    — Plotting functions
-│   ├── config.py           — Configuration dataclasses
-│   └── __init__.py         — Public API
-├── tests/                  — Unit tests
-├── config.yaml             — Central configuration
-├── .env-example            — Environment variable template
-└── pyproject.toml          — Dependencies & build config
-```
 
-## Setup
+---
 
-This project uses `pyproject.toml` for dependency management with [`uv`](https://docs.astral.sh/uv/) as the package manager. Requires Python >= 3.12.
+## 🚀 Instalación
+
+Este proyecto utiliza [`uv`](https://docs.astral.sh/uv/) como gestor de entornos y paquetes de Python (requiere Python >= 3.12).
 
 ```bash
-uv sync          # Install dependencies and create uv.lock
-uv pip install -e .  # Install package in development mode
+cd tools/litreview
+uv sync              # Resuelve dependencias y crea entorno aislado
+uv sync --extra cpu  # Modo CPU estándar
+# O con aceleración CUDA (Nvidia GPU):
+# uv sync --extra cu126
 ```
 
-## Usage
+---
 
-### 1. Configure
+## 🤖 Uso con Agentes de IA (Modo Headless / SDD)
 
-Copy `.env-example` to `.env` and fill in your Zotero credentials:
+El punto de entrada optimizado para agentes como `sota-analyst` es **`litreview-agent-summary`**:
 
 ```bash
-cp .env-example .env
+# Ejecutar sobre una colección curada en Zotero:
+uv run litreview-agent-summary --config config.yaml --collection "Pneumonia-CXR" --output-json results/summary.json
+
+# Ejecutar con un CSV local:
+uv run litreview-agent-summary --config config.yaml --input-csv data/fixtures/mock_papers.csv --output-json results/summary.json
+
+# Inyectar etiquetas candidatas dinámicas generadas por el agente:
+uv run litreview-agent-summary --config config.yaml --labels-json '{"CNN": "convolutional network", "VIT": "vision transformer"}'
 ```
 
-Edit `config.yaml` to set models, labels, and paths.
+### Esquema del JSON de Salida (`sdd-research-summary.json`)
 
-### 2. Run Analysis
+El agente recibe un JSON con la siguiente estructura lista para alimentar fases de SDD (`proposal` y `design`):
+
+```json
+{
+  "status": "success",
+  "corpus": {
+    "total_papers": 24,
+    "papers_with_abstracts": 24,
+    "year_range": [2021, 2024],
+    "item_types": { "journalArticle": 20, "conferencePaper": 4 }
+  },
+  "topics": {
+    "num_topics": 3,
+    "outlier_count": 2,
+    "topic_sizes": { "0": 12, "1": 7, "2": 3 },
+    "top_words": { "0": ["transformer", "vision", "cxr"] }
+  },
+  "taxonomy_validation": {
+    "total_classified": 22,
+    "mean_confidence": 0.7842,
+    "label_counts": { "CXR": 18, "VIT": 10, "EXT": 2 }
+  },
+  "gap_analysis": {
+    "gaps": [
+      {
+        "type": "seed_few_matches",
+        "seed": "EXT",
+        "papers": 2,
+        "severity": "medium"
+      }
+    ],
+    "num_gaps": 1
+  }
+}
+```
+
+---
+
+## 📊 Uso Tradicional y Generación de Gráficos
 
 ```bash
-litreview-analysis --config config.yaml --fetch-zotero
-```
+# Correr análisis completo y generar 15+ gráficos para papers:
+uv run litreview-analysis --config config.yaml --plots results/plots/
 
-Or with a local CSV:
-
-```bash
-litreview-analysis --config config.yaml --input papers.csv
-```
-
-### 3. Generate Plots
-
-```bash
-litreview-plots --config config.yaml
-```
-
-### 4. Programmatic Usage
-
-```python
-from litreview import ReviewPipeline, load_config
-
-config = load_config("config.yaml")
-pipeline = ReviewPipeline(config)
-report = pipeline.run()
-
-# Export results
-report.export_csv("results/")
-report.export_json("results/")
-report.generate_plots("results/plots/")
-print(report.summary())
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description |
-|---|---|
-| `ZOTERO_LIBRARY_ID` | Your Zotero library/user ID |
-| `ZOTERO_API_KEY` | Your Zotero API key |
-
-### config.yaml
-
-```yaml
-zotero:
-  library_type: user
-  collection_name: my_collection  # optional
-
-bertopic:
-  embedding_model: all-MiniLM-L6-v2
-  min_topic_size: 10
-  seed_topics: [["deep learning"], ["optimization"]]  # optional
-
-zeroshot:
-  models:
-    - facebook/bart-large-mnli
-    - typeform/distilbert-base-uncased-mnli
-  threshold: 0.5
-  candidate_labels:
-    A: Label A
-    B: Label B
-
-paths:
-  plots: results/plots
-```
-
-## Dependencies
-
-Defined in `pyproject.toml` and resolved by `uv`. See `uv.lock` for exact pinned versions.
-
-- **pandas, numpy** — Data manipulation
-- **matplotlib** — Visualization
-- **transformers, torch** — Zero-shot classification
-- **datasets** — HuggingFace dataset utilities
-- **PyYAML** — Configuration parsing
-- **pyzotero** — Zotero API client
-- **python-dotenv** — Environment variable loading
-- **bertopic** — Topic modeling
-- **sentence-transformers** — Text embeddings
-- **umap-learn, hdbscan** — Dimensionality reduction & clustering
-
-## Development
-
-```bash
-uv run pytest          # Run tests
-uv run ruff check .    # Lint
+# Solo generar/actualizar gráficos:
+uv run litreview-plots --config config.yaml
 ```

@@ -47,7 +47,7 @@ def sample_config():
             library_id="test_lib",
             api_key="test_key",
             library_type="user",
-            collection_name="test_collection",
+            collection_names=["test_collection"],
         ),
         bertopic=BERTopicConfig(
             embedding_model="all-MiniLM-L6-v2",

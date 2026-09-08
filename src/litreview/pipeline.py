@@ -11,6 +11,7 @@ import json
 import pandas as pd
 
 from litreview.config import PipelineConfig
+from litreview.fetchers.base import Fetcher
 from litreview.fetchers.zotero import ZoteroFetcher
 from litreview.analyzers.bertopic import (
     BERTopicFitter,
@@ -57,10 +58,15 @@ class ReviewPipeline:
         print(report.summary())
     """
 
-    def __init__(self, config: PipelineConfig, skip_bertopic: bool = False):
+    def __init__(
+        self,
+        config: PipelineConfig,
+        skip_bertopic: bool = False,
+        fetcher: Fetcher | None = None,
+    ):
         self.config = config
         self.skip_bertopic = skip_bertopic
-        self.fetcher = ZoteroFetcher(
+        self.fetcher = fetcher or ZoteroFetcher(
             config.zotero.library_id,
             config.zotero.api_key,
             config.zotero.library_type,

@@ -1,0 +1,25 @@
+﻿zotero:
+  library_id: "test"
+  library_type: "user"
+  api_key: "test"
+
+paths:
+  plots: "results/plots"
+
+zeroshot:
+  models:
+    - "typeform/distilbert-base-uncased-mnli"
+  threshold: 0.5
+  candidate_labels:
+    CXR: "chest x-ray radiography"
+    VIT: "vision transformer"
+    EXT: "external multicenter clinical validation"
+
+bertopic:
+  compute: true
+  embedding_model: "all-MiniLM-L6-v2"
+  min_topic_size: 2
+  candidate_labels:
+    CXR: "chest x-ray radiography"
+    VIT: "vision transformer"
+    EXT: "external multicenter clinical validation"
