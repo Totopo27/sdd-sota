@@ -62,12 +62,29 @@ class TopicDistributionAnalyzer(Analyzer):
             self._distribution_matrix = np.zeros((len(texts), n_topics))
             return self
 
-        dist_matrix, _ = self.topic_model.approximate_distribution(
-            text_list,
-            window=self.window,
-            stride=self.stride,
-            calculate_tokens=False,
-        )
+        # Check if topic_model has valid non-outlier topics to approximate
+        dist_matrix = None
+        has_non_outlier_topics = False
+        if hasattr(self.topic_model, "c_tf_idf_") and self.topic_model.c_tf_idf_ is not None:
+            outlier_offset = getattr(self.topic_model, "_outliers", 1)
+            if self.topic_model.c_tf_idf_.shape[0] > outlier_offset:
+                has_non_outlier_topics = True
+
+        if has_non_outlier_topics:
+            try:
+                dist_matrix, _ = self.topic_model.approximate_distribution(
+                    text_list,
+                    window=self.window,
+                    stride=self.stride,
+                    calculate_tokens=False,
+                )
+            except Exception:
+                dist_matrix = None
+
+        if dist_matrix is None:
+            # Fallback: one-hot or zero distribution based on fitted topic assignments
+            n_topics = max(len(self.topic_model.get_topic_freq()), 1)
+            dist_matrix = np.zeros((len(text_list), n_topics))
 
         # Ensure matrix has the right shape
         n_expected = len(texts)

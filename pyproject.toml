@@ -39,6 +39,7 @@ dependencies = [
 litreview-analysis = "litreview.cli.run_analysis:main"
 litreview-plots = "litreview.cli.run_plots:main"
 litreview-agent-summary = "litreview.cli.run_agent_summary:main"
+litreview-discover = "litreview.cli.run_discover:main"
 litreview-add-kernel = "litreview._kernel:install_kernel"
 
 [project.optional-dependencies]
