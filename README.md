@@ -130,10 +130,39 @@ El agente recibe un JSON con la siguiente estructura lista para alimentar fases 
 
 ---
 
+## 🔍 Descubrimiento Académico y Auto-Poblado en Zotero (`litreview-discover`)
+
+Podés buscar literatura científica directamente desde la terminal consultando **OpenAlex** (más de 250M de papers abiertos) e inyectándola de forma automática en una colección de Zotero:
+
+```bash
+# Descubrir e inyectar directamente en tu Zotero:
+uv run litreview-discover --query "spec driven development autonomous agents" --limit 20 --collection "SDD-Agentic-SE" --min-year 2023
+
+# Opcionales:
+#   --min-citations 10   (Filtro de impacto mínimo)
+#   --min-year 2024      (Filtrar papers recientes)
+```
+*El comando valida que cada paper tenga abstract completo, año y DOI, y los cataloga en tu biblioteca en la nube en segundos.*
+
+---
+
+## 🧠 Inteligencia Cienciométrica y Rúbrica NeurIPS
+
+Inspirado en el estado del arte de agentes de investigación académica:
+1. **Read-First Score**: Algoritmo multidimensional que pondera relevancia temática ($0.30$), PageRank en el grafo ($0.25$), volumen de citas ($0.20$), velocidad anual de citas ($0.15$) y rigor metodológico ($0.10$).
+2. **Roles Topológicos de Red**:
+   - `foundation`: Obras clásicas y pilares teóricos con alto PageRank.
+   - `frontier`: Papers recientes de alta velocidad de citas (SOTA vivo).
+   - `bridge`: Nodos con alta intermediación conectando disciplinas.
+   - `methodology_anchor`: Trabajos estándar de benchmarks o frameworks.
+3. **Rúbrica de Rigor Científico NeurIPS**: Evaluación probabilística Zero-Shot NLI sobre 5 ejes de reproducibilidad (limitaciones explícitas, código/datos abiertos, baselines, significancia estadística y cómputo/hardware).
+
+---
+
 ## 📊 Uso Tradicional y Generación de Gráficos
 
 ```bash
-# Correr análisis completo y generar 15+ gráficos para papers:
+# Correr análisis completo y generar gráficos:
 uv run litreview-analysis --config config.yaml --plots results/plots/
 
 # Solo generar/actualizar gráficos:
