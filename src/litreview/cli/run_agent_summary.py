@@ -145,12 +145,45 @@ def main():
         },
     }
 
-    # 7. Build Citation Network (Semantic Scholar / S2AG)
+    # 7. Build Citation Network (Semantic Scholar / S2AG) and Scientometric Ranking
     if not args.skip_network and report.df is not None and len(report.df) > 0:
         try:
             from litreview.network import CitationGraphBuilder, plot_citation_network
             graph_builder = CitationGraphBuilder().build_from_dataframe(report.df)
-            summary_data["citation_network"] = graph_builder.summary()
+
+            # Build topical relevance map from Zero-Shot confidence scores
+            topical_map = {}
+            if "score" in report.df.columns and "Title" in report.df.columns:
+                for _, row in report.df.iterrows():
+                    title_key = str(row.get("Title", "")).strip()
+                    if title_key:
+                        topical_map[title_key] = float(row.get("score", 0.5))
+
+            # Run NeurIPS Rigor Rubric Analyzer on corpus abstracts
+            methodology_map = {}
+            rubric_summary = {}
+            try:
+                from litreview.analyzers.rubric import NeurIPSRubricAnalyzer
+                rubric_analyzer = NeurIPSRubricAnalyzer()
+                abstracts = report.df["Abstract Note"].dropna()
+                if len(abstracts) > 0:
+                    rubric_analyzer.fit(abstracts)
+                    rubric_df = rubric_analyzer.transform(abstracts)
+                    rubric_summary = rubric_analyzer.results
+                    for idx, row in rubric_df.iterrows():
+                        paper_title = str(report.df.loc[idx, "Title"]).strip()
+                        if paper_title:
+                            methodology_map[paper_title] = float(row.get("rubric_score", 0.5))
+            except Exception as re:
+                logger.warning(f"NeurIPS rubric evaluation skipped/failed: {re}")
+
+            summary_data["citation_network"] = graph_builder.summary(
+                topical_relevance_map=topical_map,
+                methodology_scores_map=methodology_map,
+            )
+            if rubric_summary:
+                summary_data["neurips_rubric"] = rubric_summary
+
             if not args.no_plots and args.plots_dir:
                 network_plot_path = os.path.join(args.plots_dir, "citation_network.png")
                 plot_citation_network(graph_builder, network_plot_path)

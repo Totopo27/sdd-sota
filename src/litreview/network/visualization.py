@@ -21,39 +21,69 @@ def plot_citation_network(graph_builder: CitationGraphBuilder, path: str) -> Non
     # Layout using spring_layout with deterministic seed
     pos = nx.spring_layout(g, k=0.35, iterations=50, seed=42)
 
-    # Distinguish corpus vs external reference nodes
-    corpus_nodes = [n for n in g.nodes if g.nodes[n].get("in_corpus", False)]
-    external_nodes = [n for n in g.nodes if not g.nodes[n].get("in_corpus", False)]
+    # Distinguish node roles
+    roles = graph_builder.compute_graph_roles()
+    
+    foundation_nodes = [n for n in g.nodes if roles.get(n) == "foundation"]
+    frontier_nodes = [n for n in g.nodes if roles.get(n) == "frontier"]
+    bridge_nodes = [n for n in g.nodes if roles.get(n) == "bridge"]
+    other_nodes = [n for n in g.nodes if n not in foundation_nodes and n not in frontier_nodes and n not in bridge_nodes]
 
     # Compute node sizes based on in-degree (citations received)
     in_degrees = dict(g.in_degree())
-    corpus_sizes = [max(120, (in_degrees.get(n, 0) + 1) * 160) for n in corpus_nodes]
-    external_sizes = [max(80, (in_degrees.get(n, 0) + 1) * 120) for n in external_nodes]
+    def get_sizes(node_list):
+        return [max(90, (in_degrees.get(n, 0) + 1) * 140) for n in node_list]
 
-    # Draw external references
-    if external_nodes:
+    # Draw Foundation nodes (Gold/Amber)
+    if foundation_nodes:
         nx.draw_networkx_nodes(
             g,
             pos,
-            nodelist=external_nodes,
-            node_color="#f59e0b",  # Amber/Gold for foundational external works
-            node_size=external_sizes,
-            alpha=0.75,
+            nodelist=foundation_nodes,
+            node_color="#f59e0b",
+            node_size=get_sizes(foundation_nodes),
+            alpha=0.85,
             ax=ax,
-            label="Cited Foundation / External",
+            label="Foundation (Landmark / S2AG)",
         )
 
-    # Draw corpus papers
-    if corpus_nodes:
+    # Draw Frontier nodes (Emerald Green)
+    if frontier_nodes:
         nx.draw_networkx_nodes(
             g,
             pos,
-            nodelist=corpus_nodes,
-            node_color="#2563eb",  # Blue for corpus papers
-            node_size=corpus_sizes,
-            alpha=0.9,
+            nodelist=frontier_nodes,
+            node_color="#10b981",
+            node_size=get_sizes(frontier_nodes),
+            alpha=0.85,
             ax=ax,
-            label="In-Corpus Papers",
+            label="Frontier (Recent Velocity)",
+        )
+
+    # Draw Bridge nodes (Purple / Interdisciplinary)
+    if bridge_nodes:
+        nx.draw_networkx_nodes(
+            g,
+            pos,
+            nodelist=bridge_nodes,
+            node_color="#8b5cf6",
+            node_size=get_sizes(bridge_nodes),
+            alpha=0.85,
+            ax=ax,
+            label="Bridge (Betweenness Centrality)",
+        )
+
+    # Draw standard corpus / other nodes (Blue)
+    if other_nodes:
+        nx.draw_networkx_nodes(
+            g,
+            pos,
+            nodelist=other_nodes,
+            node_color="#2563eb",
+            node_size=get_sizes(other_nodes),
+            alpha=0.80,
+            ax=ax,
+            label="Corpus Literature",
         )
 
     # Draw edges with arrows

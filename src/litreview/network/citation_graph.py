@@ -206,13 +206,177 @@ class CitationGraphBuilder:
         coupling_pairs.sort(key=lambda x: x["shared_references_count"], reverse=True)
         return coupling_pairs[:top_k]
 
-    def summary(self) -> dict:
+    def compute_graph_roles(self) -> dict[str, str]:
+        """Assign scientometric roles to nodes based on network topology and age.
+
+        Roles:
+        - 'foundation': High PageRank / landmark papers from prior literature.
+        - 'frontier': Recent papers (published in the latest 2 years) with highest citation velocity.
+        - 'bridge': High betweenness centrality connecting distinct subgraphs.
+        - 'methodology_anchor': Frequently cited within the local graph.
+        - 'corpus_work': Standard in-corpus contribution.
+        """
+        if len(self.graph) == 0:
+            return {}
+
+        pagerank = self.compute_pagerank()
+        in_degrees = dict(self.graph.in_degree())
+        
+        # Calculate betweenness on undirected view for structural bridges
+        try:
+            betweenness = nx.betweenness_centrality(self.graph.to_undirected())
+        except Exception:
+            betweenness = {n: 0.0 for n in self.graph.nodes}
+
+        # Determine year boundaries
+        years = [
+            self.graph.nodes[n].get("year")
+            for n in self.graph.nodes
+            if self.graph.nodes[n].get("year") is not None
+        ]
+        max_year = max(years) if years else 2026
+        frontier_year_cutoff = max_year - 2
+
+        roles: dict[str, str] = {}
+        for node in self.graph.nodes:
+            data = self.graph.nodes[node]
+            node_year = data.get("year") or max_year
+            pr = pagerank.get(node, 0.0)
+            in_d = in_degrees.get(node, 0)
+            bw = betweenness.get(node, 0.0)
+            in_c = data.get("in_corpus", False)
+
+            if not in_c and (pr > 0.05 or in_d >= 2):
+                roles[node] = "foundation"
+            elif in_d >= 3:
+                roles[node] = "methodology_anchor"
+            elif bw > 0.10 and in_d >= 1:
+                roles[node] = "bridge"
+            elif node_year >= frontier_year_cutoff and (data.get("citation_count", 0) > 100 or (node_year == max_year and data.get("citation_count", 0) > 20)):
+                roles[node] = "frontier"
+            elif in_c:
+                roles[node] = "corpus_work"
+            else:
+                roles[node] = "external_reference"
+
+            data["role"] = roles[node]
+
+        return roles
+
+    def compute_read_first_scores(
+        self,
+        topical_relevance_map: dict[str, float] | None = None,
+        methodology_scores_map: dict[str, float] | None = None,
+        weights: dict[str, float] | None = None,
+        top_k: int = 10,
+    ) -> list[dict]:
+        """Compute multidimensional Read-First priority score for corpus papers.
+
+        Balancing:
+        - Topical relevance (Zero-Shot domain confidence)
+        - Graph prestige (PageRank)
+        - Citation impact (Log total citations)
+        - Citation velocity (Citations per year since publication)
+        - Methodology & Reproducibility (NeurIPS rubric rigor)
+        """
+        corpus_nodes = [n for n in self.graph.nodes if self.graph.nodes[n].get("in_corpus", False)]
+        if not corpus_nodes:
+            return []
+
+        default_weights = {
+            "topical_relevance": 0.30,
+            "graph_prestige": 0.25,
+            "citation_impact": 0.20,
+            "citation_velocity": 0.15,
+            "methodology": 0.10,
+        }
+        w = {**default_weights, **(weights or {})}
+        # Normalize weights
+        total_w = sum(w.values()) or 1.0
+        w = {k: v / total_w for k, v in w.items()}
+
+        pagerank = self.compute_pagerank()
+        max_pr = max([pagerank.get(n, 0.0) for n in corpus_nodes], default=1.0) or 1.0
+
+        roles = self.compute_graph_roles()
+
+        # Compute max citations and velocities for min-max scaling
+        import math
+        current_year = 2026
+        velocities = {}
+        log_citations = {}
+        for n in corpus_nodes:
+            data = self.graph.nodes[n]
+            cites = data.get("citation_count", 0)
+            year = data.get("year") or current_year
+            age = max(1, current_year - year)
+            velocities[n] = cites / age
+            log_citations[n] = math.log1p(max(0, cites))
+
+        max_vel = max(velocities.values(), default=1.0) or 1.0
+        max_log_c = max(log_citations.values(), default=1.0) or 1.0
+
+        topical_map = topical_relevance_map or {}
+        methodology_map = methodology_scores_map or {}
+
+        ranked_list = []
+        for n in corpus_nodes:
+            data = self.graph.nodes[n]
+            r_score = float(topical_map.get(n, 0.5))
+            g_score = float(pagerank.get(n, 0.0) / max_pr)
+            c_score = float(log_citations[n] / max_log_c)
+            v_score = float(velocities[n] / max_vel)
+            m_score = float(methodology_map.get(n, 0.5))
+
+            composite = (
+                w["topical_relevance"] * r_score
+                + w["graph_prestige"] * g_score
+                + w["citation_impact"] * c_score
+                + w["citation_velocity"] * v_score
+                + w["methodology"] * m_score
+            )
+
+            ranked_list.append({
+                "title": data.get("title", n),
+                "year": data.get("year"),
+                "read_first_score": round(composite, 4),
+                "role": roles.get(n, "corpus_work"),
+                "score_components": {
+                    "topical_relevance": round(r_score, 4),
+                    "graph_prestige": round(g_score, 4),
+                    "citation_impact": round(c_score, 4),
+                    "citation_velocity": round(v_score, 4),
+                    "methodology": round(m_score, 4),
+                },
+                "citations": data.get("citation_count", 0),
+                "doi": data.get("doi"),
+            })
+
+        ranked_list.sort(key=lambda x: x["read_first_score"], reverse=True)
+        return ranked_list[:top_k]
+
+    def summary(
+        self,
+        topical_relevance_map: dict[str, float] | None = None,
+        methodology_scores_map: dict[str, float] | None = None,
+    ) -> dict:
         """Generate structured summary for SDD Agent Evidence Receipt."""
         corpus_count = sum(1 for n in self.graph.nodes if self.graph.nodes[n].get("in_corpus", False))
+        roles = self.compute_graph_roles()
+        role_distribution = defaultdict(int)
+        for r in roles.values():
+            role_distribution[r] += 1
+
         return {
             "total_nodes": self.graph.number_of_nodes(),
             "total_edges": self.graph.number_of_edges(),
             "corpus_papers_modeled": corpus_count,
+            "role_distribution": dict(role_distribution),
+            "read_first_recommendations": self.compute_read_first_scores(
+                topical_relevance_map=topical_relevance_map,
+                methodology_scores_map=methodology_scores_map,
+                top_k=5,
+            ),
             "foundational_papers": self.get_foundational_papers(top_k=5),
             "derivative_works": self.get_derivative_works(top_k=5),
             "bibliographic_coupling": self.compute_bibliographic_coupling(top_k=5),
