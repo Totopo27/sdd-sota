@@ -50,16 +50,35 @@ def compute_topic_coverage(
     outlier_count = topic_sizes.get(-1, 0)
     topic_sizes_clean = {k: v for k, v in topic_sizes.items() if k != -1}
 
-    scores = validation_df["score"]
+    scores = validation_df["score"].dropna()
     classified = validation_df["classified"].sum()
+    n_scores = len(scores)
+
+    mean_c = float(scores.mean()) if n_scores > 0 else 0.0
+    median_c = float(scores.median()) if n_scores > 0 else 0.0
+    std_c = float(scores.std(ddof=1)) if n_scores > 1 else 0.0
+    var_c = float(scores.var(ddof=1)) if n_scores > 1 else 0.0
+
+    # 95% Confidence Interval for the mean using normal approximation
+    if n_scores > 1:
+        import math
+        std_err = std_c / math.sqrt(n_scores)
+        ci_lower = max(0.0, mean_c - 1.96 * std_err)
+        ci_upper = min(1.0, mean_c + 1.96 * std_err)
+        ci_95 = [round(ci_lower, 4), round(ci_upper, 4)]
+    else:
+        ci_95 = [round(mean_c, 4), round(mean_c, 4)]
 
     return {
         "topic_sizes": topic_sizes_clean,
         "outlier_count": outlier_count,
         "num_topics": len(topic_sizes_clean),
         "total_classified": int(classified),
-        "mean_confidence": float(scores.mean()),
-        "median_confidence": float(scores.median()),
+        "mean_confidence": round(mean_c, 4),
+        "median_confidence": round(median_c, 4),
+        "std_confidence": round(std_c, 4),
+        "variance_confidence": round(var_c, 4),
+        "confidence_ci_95": ci_95,
     }
 
 

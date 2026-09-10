@@ -227,6 +227,11 @@ class Report:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         self.df.to_csv(path, index=False)
 
+    def export_parquet(self, path: str) -> None:
+        """Export full DataFrame to compressed columnar Apache Parquet format."""
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        self.df.to_parquet(path, index=False, engine="pyarrow")
+
     def export_json(self, path: str) -> None:
         """Export statistics summary to JSON."""
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)

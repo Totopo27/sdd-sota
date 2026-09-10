@@ -42,6 +42,11 @@ def main():
         help="Path for classified papers CSV export",
     )
     parser.add_argument(
+        "--output-parquet",
+        default="results/classified.parquet",
+        help="Path for compressed columnar Parquet export",
+    )
+    parser.add_argument(
         "--plots-dir",
         default="results/plots",
         help="Directory to save generated charts",
@@ -115,6 +120,10 @@ def main():
         os.makedirs(os.path.dirname(args.output_csv) or ".", exist_ok=True)
         report.export_csv(args.output_csv)
 
+    if args.output_parquet:
+        os.makedirs(os.path.dirname(args.output_parquet) or ".", exist_ok=True)
+        report.export_parquet(args.output_parquet)
+
     if not args.no_plots and args.plots_dir:
         try:
             report.generate_plots(args.plots_dir)
@@ -135,12 +144,16 @@ def main():
             "total_classified": report.topic_coverage.get("total_classified", 0),
             "mean_confidence": round(report.topic_coverage.get("mean_confidence", 0.0), 4),
             "median_confidence": round(report.topic_coverage.get("median_confidence", 0.0), 4),
+            "std_confidence": report.topic_coverage.get("std_confidence", 0.0),
+            "variance_confidence": report.topic_coverage.get("variance_confidence", 0.0),
+            "confidence_ci_95": report.topic_coverage.get("confidence_ci_95", []),
             "label_counts": report.zeroshot_results.get("label_counts", {}),
         },
         "gap_analysis": report.gap_analysis,
         "cross_analysis": report.cross_analysis,
         "artifacts": {
             "csv_path": args.output_csv if args.output_csv else None,
+            "parquet_path": args.output_parquet if args.output_parquet else None,
             "plots_dir": args.plots_dir if not args.no_plots else None,
         },
     }
