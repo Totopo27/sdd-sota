@@ -6,6 +6,8 @@ import time
 from typing import Any
 from pyzotero import zotero
 
+from litreview.discovery.dedup import PaperDeduplicator
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,6 +54,91 @@ class ZoteroPopulator:
         else:
             raise RuntimeError(f"Failed to create Zotero collection '{collection_name}': {res}")
 
+    def get_existing_papers(self, collection_name: str) -> list[dict[str, Any]]:
+        """Retrieve existing papers from a Zotero collection to prevent duplicate insertion.
+
+        Returns:
+            List of paper dicts containing title, doi, year, abstract.
+        """
+        collection_name = collection_name.strip()
+        existing_collections = self.zot.collections()
+        collection_key = None
+        for col in existing_collections:
+            if col["data"]["name"].lower() == collection_name.lower():
+                collection_key = col["key"]
+                break
+
+        if not collection_key:
+            return []
+
+        try:
+            items = self.zot.collection_items(collection_key)
+        except Exception as e:
+            logger.warning(f"Failed to fetch existing items from collection '{collection_name}': {e}")
+            return []
+
+        papers: list[dict[str, Any]] = []
+        for it in items:
+            data = it.get("data", {})
+            title = data.get("title", "").strip()
+            if not title:
+                continue
+            papers.append({
+                "title": title,
+                "doi": data.get("DOI", "").strip(),
+                "year": data.get("date", "").strip(),
+                "abstract": data.get("abstractNote", "").strip(),
+                "key": it.get("key", ""),
+            })
+        return papers
+
+    def filter_existing_duplicates(
+        self,
+        candidates: list[dict[str, Any]],
+        collection_name: str,
+        year_slack: int = 1,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Filter out candidates that already exist in the target Zotero collection.
+
+        Also eliminates duplicate occurrences within the candidate list itself.
+
+        Returns:
+            (unique_candidates, skipped_count)
+        """
+        if not candidates:
+            return [], 0
+
+        dedup = PaperDeduplicator(year_slack=year_slack)
+        existing = self.get_existing_papers(collection_name)
+
+        unique_candidates: list[dict[str, Any]] = []
+        skipped_count = 0
+
+        for cand in candidates:
+            # 1. Check against already existing items in Zotero
+            already_exists = False
+            for ex in existing:
+                if dedup.are_duplicates(cand, ex):
+                    already_exists = True
+                    break
+            if already_exists:
+                skipped_count += 1
+                continue
+
+            # 2. Check against already accepted candidates in this batch
+            is_internal_dup = False
+            for accepted in unique_candidates:
+                if dedup.are_duplicates(cand, accepted):
+                    is_internal_dup = True
+                    break
+            if is_internal_dup:
+                skipped_count += 1
+                continue
+
+            unique_candidates.append(cand)
+
+        return unique_candidates, skipped_count
+
     def populate_papers(
         self,
         papers: list[dict[str, Any]],
@@ -83,6 +170,18 @@ class ZoteroPopulator:
             item["DOI"] = p.get("doi", "") or ""
             item["publicationTitle"] = p.get("venue", "") or ""
             item["collections"] = [collection_key]
+
+            # OA Link and Extra metadata
+            oa_url = p.get("oa_url")
+            if oa_url:
+                item["url"] = oa_url
+
+            if p.get("is_oa"):
+                oa_status = p.get("oa_status") or "open"
+                extra_lines = [f"Open Access: {oa_status}"]
+                if oa_url:
+                    extra_lines.append(f"OA URL: {oa_url}")
+                item["extra"] = "\n".join(extra_lines)
 
             # Authors
             creators = []

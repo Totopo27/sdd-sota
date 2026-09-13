@@ -69,9 +69,9 @@ class PaperDeduplicator:
 
     def are_duplicates(self, p1: dict | pd.Series, p2: dict | pd.Series) -> bool:
         """Determine if two paper representations represent the same work."""
-        # 1. DOI check
-        doi1 = normalize_doi(str(p1.get("DOI") or ""))
-        doi2 = normalize_doi(str(p2.get("DOI") or ""))
+        # 1. DOI check (case-insensitive key)
+        doi1 = normalize_doi(str(p1.get("DOI") or p1.get("doi") or ""))
+        doi2 = normalize_doi(str(p2.get("DOI") or p2.get("doi") or ""))
         if doi1 and doi2 and doi1 == doi2:
             return True
 
@@ -87,17 +87,30 @@ class PaperDeduplicator:
 
         sim = title_token_similarity(norm1, norm2)
         if sim >= self.title_similarity_threshold:
-            # Check year slack
-            y1 = p1.get("Publication Year") if "Publication Year" in p1 else p1.get("year")
-            y2 = p2.get("Publication Year") if "Publication Year" in p2 else p2.get("year")
+            # Check year slack (supporting Publication Year, year, publication_year, and date)
+            y1 = (
+                p1.get("Publication Year")
+                or p1.get("year")
+                or p1.get("publication_year")
+                or p1.get("date")
+            )
+            y2 = (
+                p2.get("Publication Year")
+                or p2.get("year")
+                or p2.get("publication_year")
+                or p2.get("date")
+            )
 
             try:
-                y1_int = int(y1) if y1 is not None and not pd.isna(y1) else None
+                # In case date is a full string like '2023-05-12'
+                y1_int = int(str(y1)[:4]) if y1 is not None and not pd.isna(y1) else None
             except (ValueError, TypeError):
                 y1_int = None
 
             try:
-                y2_int = int(y2) if y2 is not None and not pd.isna(y2) else None
+                y2_int = int(str(y2)[:4]) if y2 is not None and not pd.isna(y2) else None
+            except (ValueError, TypeError):
+                y2_int = None
             except (ValueError, TypeError):
                 y2_int = None
 
