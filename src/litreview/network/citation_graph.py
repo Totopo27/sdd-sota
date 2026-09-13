@@ -2,6 +2,7 @@
 
 import logging
 from collections import defaultdict
+from contextlib import nullcontext
 import networkx as nx
 import pandas as pd
 
@@ -81,33 +82,35 @@ class CitationGraphBuilder:
             self.add_paper_record(title, year=year, doi=doi, in_corpus=True)
 
         # Pass 2: Query Semantic Scholar for references and internal/external citations
-        for _, row in papers_to_process.iterrows():
-            title = str(row.get("Title", "")).strip()
-            doi = row.get("DOI")
-            if not title:
-                continue
+        ctx = client if hasattr(client, "__enter__") else nullcontext()
+        with ctx:
+            for _, row in papers_to_process.iterrows():
+                title = str(row.get("Title", "")).strip()
+                doi = row.get("DOI")
+                if not title:
+                    continue
 
-            metadata = client.get_paper_for_record(title=title, doi=doi)
-            if not metadata:
-                continue
+                metadata = client.get_paper_for_record(title=title, doi=doi)
+                if not metadata:
+                    continue
 
-            # Update citation counts on the paper node
-            if self.graph.has_node(title):
-                self.graph.nodes[title]["citation_count"] = metadata.get("citationCount", 0)
-                self.graph.nodes[title]["influential_count"] = metadata.get("influentialCitationCount", 0)
+                # Update citation counts on the paper node
+                if self.graph.has_node(title):
+                    self.graph.nodes[title]["citation_count"] = metadata.get("citationCount", 0)
+                    self.graph.nodes[title]["influential_count"] = metadata.get("influentialCitationCount", 0)
 
-            # Add references (papers that this paper cites)
-            refs = metadata.get("references", []) or []
-            for ref in refs:
-                ref_title = ref.get("title")
-                if ref_title and str(ref_title).strip():
-                    clean_ref_title = str(ref_title).strip()
-                    self.add_paper_record(
-                        clean_ref_title,
-                        year=ref.get("year"),
-                        in_corpus=False,
-                    )
-                    self.add_citation(title, clean_ref_title)
+                # Add references (papers that this paper cites)
+                refs = metadata.get("references", []) or []
+                for ref in refs:
+                    ref_title = ref.get("title")
+                    if ref_title and str(ref_title).strip():
+                        clean_ref_title = str(ref_title).strip()
+                        self.add_paper_record(
+                            clean_ref_title,
+                            year=ref.get("year"),
+                            in_corpus=False,
+                        )
+                        self.add_citation(title, clean_ref_title)
 
         return self
 

@@ -1,8 +1,11 @@
 """Zero-shot classification analyzer for paper topic validation."""
 
+import logging
 import pandas as pd
 import torch
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 from litreview.analyzers.base import Analyzer
 from litreview.config import ZeroShotConfig
@@ -89,35 +92,49 @@ class ZeroShotAnalyzer(Analyzer):
 
         results = []
         if non_empty:
-            batch_size = getattr(self.config, "batch_size", 64)
+            current_batch_size = getattr(self.config, "batch_size", 64)
 
-            # Generator yielding individual strings
             def item_generator():
                 for text in non_empty:
                     yield text
 
-            # Stream individual strings into pipeline; pass batch_size for GPU batching
-            pipeline_outputs = self._pipeline(
-                item_generator(),
-                candidate_labels=labels,
-                multi_label=True,
-                batch_size=batch_size,
-                truncation=True,
-                max_length=256,
-            )
+            while current_batch_size >= 1:
+                try:
+                    # Stream individual strings into pipeline; pass batch_size for GPU batching
+                    pipeline_outputs = self._pipeline(
+                        item_generator(),
+                        candidate_labels=labels,
+                        multi_label=True,
+                        batch_size=current_batch_size,
+                        truncation=True,
+                        max_length=256,
+                    )
 
-            # tqdm steps for every single text yielded back
-            for item in tqdm(
-                pipeline_outputs,
-                total=len(non_empty),
-                desc="Zero-shot classification",
-            ):
-                scores = item["scores"]
-                best_idx = scores.index(max(scores))
-                results.append({
-                    "label": item["labels"][best_idx],
-                    "score": scores[best_idx],
-                })
+                    temp_results = []
+                    # tqdm steps for every single text yielded back
+                    for item in tqdm(
+                        pipeline_outputs,
+                        total=len(non_empty),
+                        desc=f"Zero-shot classification (batch={current_batch_size})",
+                    ):
+                        scores = item["scores"]
+                        best_idx = scores.index(max(scores))
+                        temp_results.append({
+                            "label": item["labels"][best_idx],
+                            "score": scores[best_idx],
+                        })
+                    results = temp_results
+                    break
+                except RuntimeError as e:
+                    if "out of memory" in str(e).lower() and current_batch_size > 1:
+                        logger.warning(
+                            f"Out of memory with batch_size={current_batch_size}. Clearing cache and retrying with batch_size={current_batch_size // 2}"
+                        )
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        current_batch_size //= 2
+                    else:
+                        raise e
 
         # Interleave results back, preserving original order
         result_iter = iter(results)

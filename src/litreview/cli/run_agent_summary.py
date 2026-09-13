@@ -17,6 +17,7 @@ from pathlib import Path
 
 from litreview import ReviewPipeline, load_config
 from litreview.fetchers.csv_fetcher import CSVFetcher
+from litreview.fetchers.parquet_fetcher import ParquetFetcher
 
 
 def main():
@@ -26,6 +27,7 @@ def main():
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
     parser.add_argument("--collection", default=None, help="Zotero collection name to fetch from")
     parser.add_argument("--input-csv", default=None, help="Local CSV file path (bypasses Zotero)")
+    parser.add_argument("--input-parquet", default=None, help="Local Parquet file path (bypasses Zotero and CSV)")
     parser.add_argument(
         "--labels-json",
         default=None,
@@ -96,7 +98,12 @@ def main():
 
     # 3. Choose fetcher
     fetcher = None
-    if args.input_csv:
+    if args.input_parquet:
+        if not os.path.exists(args.input_parquet):
+            print(f"Error: Input Parquet '{args.input_parquet}' not found.", file=sys.stderr)
+            sys.exit(1)
+        fetcher = ParquetFetcher(args.input_parquet)
+    elif args.input_csv:
         if not os.path.exists(args.input_csv):
             print(f"Error: Input CSV '{args.input_csv}' not found.", file=sys.stderr)
             sys.exit(1)

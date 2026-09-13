@@ -22,6 +22,7 @@ class SemanticScholarClient:
         api_key: str | None = None,
         cache_path: str | Path | None = None,
         min_request_interval: float = 1.0,
+        auto_flush: bool = True,
     ):
         self.api_key = api_key or os.getenv("SEMANTIC_SCHOLAR_API_KEY")
         
@@ -37,6 +38,9 @@ class SemanticScholarClient:
         self.min_request_interval = min_request_interval
         self._last_request_time = 0.0
         self.cache = self._load_cache()
+        self.auto_flush = auto_flush
+        self._dirty = False
+        self._batch_depth = 0
 
     def _load_cache(self) -> dict:
         if self.cache_path.exists():
@@ -54,9 +58,36 @@ class SemanticScholarClient:
         except Exception as e:
             logger.warning(f"Failed to persist Semantic Scholar cache to {self.cache_path}: {e}")
 
+    def flush_cache(self) -> None:
+        """Persist cache to disk if modifications were made."""
+        if self._dirty:
+            self._save_cache()
+            self._dirty = False
+
     def _update_cache(self, key: str, data: dict) -> None:
         self.cache[key] = data
-        self._save_cache()
+        self._dirty = True
+        if self.auto_flush and self._batch_depth == 0:
+            self._save_cache()
+            self._dirty = False
+
+    def __enter__(self):
+        self._batch_depth += 1
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._batch_depth = max(0, self._batch_depth - 1)
+        if self._batch_depth == 0:
+            self.flush_cache()
+
+    def close(self) -> None:
+        self.flush_cache()
+
+    def __del__(self):
+        try:
+            self.flush_cache()
+        except Exception:
+            pass
 
     def _get_headers(self) -> dict:
         headers = {

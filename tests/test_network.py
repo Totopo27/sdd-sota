@@ -35,6 +35,23 @@ class TestSemanticScholarClient:
         client2 = SemanticScholarClient(cache_path=cache_file)
         assert client2.cache.get("paper_123")["title"] == "Test Paper"
 
+    def test_batch_context_manager_defers_save(self, tmp_path):
+        cache_file = tmp_path / "s2_batch_cache.json"
+        client = SemanticScholarClient(cache_path=cache_file)
+
+        with client:
+            client._update_cache("p1", {"title": "Paper 1"})
+            # File should not be written to disk yet during batch mode
+            assert not cache_file.exists()
+            client._update_cache("p2", {"title": "Paper 2"})
+            assert not cache_file.exists()
+
+        # Flushed to disk after exiting context manager
+        assert cache_file.exists()
+        with open(cache_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        assert "p1" in data and "p2" in data
+
     def test_get_paper_for_record_mocked(self, monkeypatch, tmp_path):
         cache_file = tmp_path / "s2_cache.json"
         client = SemanticScholarClient(cache_path=cache_file)

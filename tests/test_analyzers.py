@@ -120,3 +120,35 @@ class TestZeroShotAnalyzer:
         analyzer.fit_transform(abstracts)
         results = analyzer.results
         assert "classifications" in results
+
+    def test_oom_backoff_and_retry(self, monkeypatch):
+        """Test that CUDA OOM errors trigger automatic batch size reduction and retry."""
+        from unittest.mock import MagicMock
+        import pandas as pd
+
+        analyzer = ZeroShotAnalyzer(
+            candidate_labels={"A": "test label"},
+            threshold=0.5,
+        )
+        texts = pd.Series(["Paper text 1", "Paper text 2"])
+
+        attempts = []
+
+        def mock_pipeline_call(item_gen, candidate_labels=None, multi_label=True, batch_size=64, **kwargs):
+            attempts.append(batch_size)
+            if batch_size == 64:
+                raise RuntimeError("CUDA out of memory. Tried to allocate 1.50 GiB")
+            # When backoff reduces batch size, succeed:
+            return [
+                {"labels": ["test label"], "scores": [0.95]},
+                {"labels": ["test label"], "scores": [0.88]},
+            ]
+
+        mock_pipe = MagicMock(side_effect=mock_pipeline_call)
+        analyzer._pipeline = mock_pipe
+
+        df = analyzer.transform(texts)
+        assert len(df) == 2
+        assert attempts == [64, 32]
+        assert df["classified"].all()
+
