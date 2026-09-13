@@ -2,5 +2,20 @@
 
 from litreview.discovery.openalex import OpenAlexClient, reconstruct_abstract
 from litreview.discovery.zotero_populator import ZoteroPopulator
+from litreview.discovery.oa_resolver import OAResolver, normalize_doi
+from litreview.discovery.dedup import (
+    PaperDeduplicator,
+    normalize_title,
+    title_token_similarity,
+)
 
-__all__ = ["OpenAlexClient", "reconstruct_abstract", "ZoteroPopulator"]
+__all__ = [
+    "OpenAlexClient",
+    "reconstruct_abstract",
+    "ZoteroPopulator",
+    "OAResolver",
+    "normalize_doi",
+    "PaperDeduplicator",
+    "normalize_title",
+    "title_token_similarity",
+]

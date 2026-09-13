@@ -76,3 +76,40 @@ class TestReviewPipeline:
         report = pipeline.run()
         assert isinstance(report, Report)
         assert len(report.df) == len(sample_df)
+
+    def test_pipeline_clean_dedup_and_oa(self, sample_config):
+        from unittest.mock import patch, MagicMock
+
+        dirty_df = pd.DataFrame([
+            {
+                "Title": "Transformer Models for Code",
+                "Abstract Note": "First abstract.",
+                "DOI": "10.1234/code.1",
+                "Publication Year": 2023,
+            },
+            {
+                "Title": "Transformer Models for Code.",
+                "Abstract Note": "First abstract with more details.",
+                "DOI": "10.1234/code.1",
+                "Publication Year": 2024,
+            },
+            {
+                "Title": "Second Unique Paper",
+                "Abstract Note": "",
+                "DOI": "10.5678/oa.2",
+                "Publication Year": 2024,
+            },
+        ])
+
+        with patch("litreview.pipeline.OAResolver") as mock_oa_cls:
+            mock_resolver = MagicMock()
+            mock_resolver.enrich_dataframe.side_effect = lambda df, **kwargs: df.assign(
+                **{"Abstract Note": df["Abstract Note"].replace("", "Recovered OA Abstract"), "is_oa": True}
+            )
+            mock_oa_cls.return_value = mock_resolver
+
+            cleaned = ReviewPipeline._clean(dirty_df, resolve_oa=True, dedup=True)
+
+            assert len(cleaned) == 2  # The duplicate was merged
+            assert "Recovered OA Abstract" in cleaned["Abstract Note"].values
+

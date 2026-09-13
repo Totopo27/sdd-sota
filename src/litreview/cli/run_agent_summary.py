@@ -68,6 +68,16 @@ def main():
         action="store_true",
         help="Skip Semantic Scholar citation graph analysis",
     )
+    parser.add_argument(
+        "--resolve-oa",
+        action="store_true",
+        help="Attempt to recover missing abstracts and identify Open Access links via Europe PMC and Unpaywall",
+    )
+    parser.add_argument(
+        "--no-dedup",
+        action="store_true",
+        help="Disable automatic cross-source deduplication with year-slack",
+    )
     args = parser.parse_args()
 
     # 1. Load config
@@ -110,7 +120,13 @@ def main():
         fetcher = CSVFetcher(args.input_csv)
 
     # 4. Run pipeline
-    pipeline = ReviewPipeline(config, skip_bertopic=args.skip_bertopic, fetcher=fetcher)
+    pipeline = ReviewPipeline(
+        config,
+        skip_bertopic=args.skip_bertopic,
+        fetcher=fetcher,
+        resolve_oa=args.resolve_oa,
+        dedup=not args.no_dedup,
+    )
     try:
         report = pipeline.run()
     except Exception as e:
@@ -164,6 +180,15 @@ def main():
             "plots_dir": args.plots_dir if not args.no_plots else None,
         },
     }
+
+    if report.df is not None and "is_oa" in report.df.columns:
+        oa_count = int(report.df["is_oa"].sum())
+        total_p = len(report.df)
+        summary_data["open_access"] = {
+            "oa_count": oa_count,
+            "total_papers": total_p,
+            "oa_ratio": round(oa_count / total_p, 4) if total_p > 0 else 0.0,
+        }
 
     # 7. Build Citation Network (Semantic Scholar / S2AG) and Scientometric Ranking
     if not args.skip_network and report.df is not None and len(report.df) > 0:

@@ -11,6 +11,7 @@ import json
 import pandas as pd
 
 from litreview.config import PipelineConfig
+from litreview.discovery import OAResolver, PaperDeduplicator
 from litreview.fetchers.base import Fetcher
 from litreview.fetchers.zotero import ZoteroFetcher
 from litreview.analyzers.bertopic import (
@@ -63,6 +64,8 @@ class ReviewPipeline:
         config: PipelineConfig,
         skip_bertopic: bool = False,
         fetcher: Fetcher | None = None,
+        resolve_oa: bool = False,
+        dedup: bool = True,
     ):
         self.config = config
         self.skip_bertopic = skip_bertopic
@@ -71,6 +74,8 @@ class ReviewPipeline:
             config.zotero.api_key,
             config.zotero.library_type,
         )
+        self.resolve_oa = resolve_oa
+        self.dedup = dedup
         self.zeroshot_analyzer = ZeroShotAnalyzer(config.zeroshot)
 
     def run(self) -> "Report":
@@ -82,8 +87,8 @@ class ReviewPipeline:
         # 1. Fetch
         df = self.fetcher.fetch(self.config.zotero.collection_names)
 
-        # 2. Clean
-        df = self._clean(df)
+        # 2. Clean, deduplicate and optionally resolve OA
+        df = self._clean(df, resolve_oa=self.resolve_oa, dedup=self.dedup)
 
         abstracts = df["Abstract Note"].dropna()
 
@@ -179,17 +184,33 @@ class ReviewPipeline:
             config=self.config,
         )
 
-    @staticmethod
-    def _clean(df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize text and remove duplicates by title."""
-        df["Title"] = df["Title"].apply(ReviewPipeline._normalize_text)
-        df["Abstract Note"] = df["Abstract Note"].apply(ReviewPipeline._normalize_text)
+    @classmethod
+    def _clean(
+        cls,
+        df: pd.DataFrame,
+        resolve_oa: bool = False,
+        dedup: bool = True,
+    ) -> pd.DataFrame:
+        """Clean, deduplicate, and optionally recover abstracts via Open Access APIs."""
+        if df.empty:
+            return df
 
-        # Dedup by normalized title only
-        df = df.drop_duplicates(subset=["Title"], keep="first")
+        cleaned_df = df.copy()
 
-        df.reset_index(drop=True, inplace=True)
-        return df
+        # 1. Deduplication using year-slack and multi-field merging
+        if dedup:
+            deduplicator = PaperDeduplicator(year_slack=1)
+            cleaned_df = deduplicator.deduplicate_dataframe(cleaned_df)
+        else:
+            cleaned_df = cleaned_df.drop_duplicates(subset=["Title"], keep="first")
+
+        # 2. Open Access abstract recovery
+        if resolve_oa:
+            resolver = OAResolver()
+            cleaned_df = resolver.enrich_dataframe(cleaned_df)
+
+        cleaned_df.reset_index(drop=True, inplace=True)
+        return cleaned_df
 
     @staticmethod
     def _normalize_text(text):
