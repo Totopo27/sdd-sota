@@ -183,6 +183,86 @@ class CitationGraphBuilder:
             })
         return results
 
+    def compute_hits(self, max_iter: int = 200, normalized: bool = True) -> tuple[dict[str, float], dict[str, float]]:
+        """Compute Kleinberg's HITS metric, returning (hubs, authorities).
+
+        Authorities represent papers with high foundational prestige cited by many hubs.
+        Hubs represent comprehensive surveys or review papers citing many authorities.
+        """
+        if len(self.graph) == 0:
+            return {}, {}
+        try:
+            hubs, authorities = nx.hits(self.graph, max_iter=max_iter, normalized=normalized)
+            return hubs, authorities
+        except Exception as e:
+            logger.warning(f"HITS computation failed: {e}")
+            in_degrees = dict(self.graph.in_degree())
+            out_degrees = dict(self.graph.out_degree())
+            total_in = sum(in_degrees.values()) or 1.0
+            total_out = sum(out_degrees.values()) or 1.0
+            authorities = {n: round(in_degrees.get(n, 0) / total_in, 5) for n in self.graph.nodes}
+            hubs = {n: round(out_degrees.get(n, 0) / total_out, 5) for n in self.graph.nodes}
+            return hubs, authorities
+
+    def get_top_authorities(self, top_k: int = 5) -> list[dict]:
+        """Identify top Authority papers in the citation landscape."""
+        if len(self.graph) == 0:
+            return []
+
+        _, authorities = self.compute_hits()
+        sorted_nodes = sorted(
+            self.graph.nodes,
+            key=lambda n: authorities.get(n, 0.0),
+            reverse=True,
+        )
+
+        results = []
+        for node in sorted_nodes[:top_k]:
+            data = self.graph.nodes[node]
+            score = round(authorities.get(node, 0.0), 5)
+            if score == 0.0 and len(results) >= 1:
+                break
+            results.append({
+                "title": data.get("title", node),
+                "year": data.get("year"),
+                "in_corpus": data.get("in_corpus", False),
+                "authority_score": score,
+                "total_citations": data.get("citation_count", 0),
+                "influential_citations": data.get("influential_count", 0),
+                "doi": data.get("doi"),
+            })
+        return results
+
+    def get_top_hubs(self, top_k: int = 5) -> list[dict]:
+        """Identify top Hub papers (comprehensive syntheses/surveys)."""
+        if len(self.graph) == 0:
+            return []
+
+        hubs, _ = self.compute_hits()
+        out_degrees = dict(self.graph.out_degree())
+        sorted_nodes = sorted(
+            self.graph.nodes,
+            key=lambda n: (hubs.get(n, 0.0), out_degrees.get(n, 0)),
+            reverse=True,
+        )
+
+        results = []
+        for node in sorted_nodes[:top_k]:
+            data = self.graph.nodes[node]
+            score = round(hubs.get(node, 0.0), 5)
+            if score == 0.0 and out_degrees.get(node, 0) == 0 and len(results) >= 1:
+                break
+            results.append({
+                "title": data.get("title", node),
+                "year": data.get("year"),
+                "in_corpus": data.get("in_corpus", False),
+                "hub_score": score,
+                "references_cited_count": out_degrees.get(node, 0),
+                "total_citations": data.get("citation_count", 0),
+                "doi": data.get("doi"),
+            })
+        return results
+
     def compute_bibliographic_coupling(self, top_k: int = 5) -> list[dict]:
         """Find pairs of papers in the corpus that share the most common references."""
         corpus_nodes = [n for n in self.graph.nodes if self.graph.nodes[n].get("in_corpus", False)]
@@ -381,6 +461,9 @@ class CitationGraphBuilder:
                 top_k=5,
             ),
             "foundational_papers": self.get_foundational_papers(top_k=5),
+            "top_authorities": self.get_top_authorities(top_k=5),
+            "top_hubs": self.get_top_hubs(top_k=5),
             "derivative_works": self.get_derivative_works(top_k=5),
             "bibliographic_coupling": self.compute_bibliographic_coupling(top_k=5),
         }
+

@@ -265,6 +265,38 @@ class Report:
         with open(path, "w") as f:
             json.dump(summary, f, indent=2, default=str)
 
+    def export_markdown(
+        self,
+        path: str,
+        citation_summary: dict | None = None,
+        rubric_summary: dict | None = None,
+    ) -> str:
+        """Export comprehensive executive markdown research briefing to disk."""
+        from litreview.reporting.executive_report import export_markdown_report
+
+        summary_data = {
+            "corpus": self.corpus_stats,
+            "topic_coverage": self.topic_coverage,
+            "gap_analysis": self.gap_analysis,
+            "cross_analysis": self.cross_analysis,
+            "taxonomy_validation": {
+                "label_counts": self.zeroshot_results.get("label_counts", {}),
+            },
+            "citation_network": citation_summary or {},
+            "neurips_rubric": rubric_summary or {},
+        }
+        if self.df is not None and "is_oa" in self.df.columns:
+            oa_count = int(self.df["is_oa"].sum())
+            total_p = len(self.df)
+            summary_data["open_access"] = {
+                "oa_count": oa_count,
+                "total_papers": total_p,
+                "oa_ratio": round(oa_count / total_p, 4) if total_p > 0 else 0.0,
+            }
+
+        return export_markdown_report(path, summary_data, scored_df=self.df)
+
+
     def generate_plots(self, path: str) -> None:
         """Generate all plots to directory."""
         os.makedirs(path, exist_ok=True)

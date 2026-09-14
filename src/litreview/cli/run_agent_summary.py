@@ -158,7 +158,14 @@ def main():
         default="data/raw_pdfs",
         help="Local directory to cache or read full-text PDFs",
     )
+    parser.add_argument(
+        "--output-report",
+        default="results/sdd-research-report.md",
+        help="Path for executive Markdown research briefing export",
+    )
     args = parser.parse_args()
+
+
 
 
     # 1. Load config
@@ -337,13 +344,24 @@ def main():
             print(f"Warning: Citation network analysis skipped/failed: {e}", file=sys.stderr)
             summary_data["citation_network"] = {"status": "unavailable", "reason": str(e)}
 
-    # 8. Write output JSON
+    # 8. Generate Executive Markdown Research Briefing
+    if args.output_report:
+        try:
+            from litreview.reporting.executive_report import export_markdown_report
+            scored_df = report.df if report is not None else None
+            export_markdown_report(args.output_report, summary_data, scored_df=scored_df)
+            summary_data["artifacts"]["markdown_report"] = args.output_report
+        except Exception as me:
+            logger.warning(f"Failed to generate executive markdown report: {me}")
+
+    # 9. Write output JSON
     os.makedirs(os.path.dirname(args.output_json) or ".", exist_ok=True)
     with open(args.output_json, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2, default=str)
 
-    # 8. Print JSON summary to stdout
+    # 10. Print JSON summary to stdout
     print(json.dumps(summary_data, indent=2, default=str))
+
 
 
 if __name__ == "__main__":
