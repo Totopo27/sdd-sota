@@ -169,30 +169,41 @@ class BERTopicFitter:
 
         num_samples = len(valid_texts)
 
-        # Prevent UMAP n_neighbors and n_components from exceeding sample size
-        n_neighbors = min(5, max(2, num_samples - 1))
-        n_components = min(5, max(1, num_samples - 2)) if num_samples > 3 else 1
-        init_mode = "random" if num_samples < 15 else "spectral"
+        if num_samples < 10:
+            from sklearn.cluster import KMeans
+            from sklearn.decomposition import PCA
 
-        # Safe defaults for UMAP
-        umap_kwargs = dict(
-            n_neighbors=n_neighbors,
-            n_components=n_components,
-            init=init_mode,
-            min_dist=0.0,
-            metric="cosine",
-            **self.config.umap_kwargs,
-        )
+            pca_components = min(2, max(1, num_samples - 1))
+            umap_model = PCA(n_components=pca_components)
+            n_clusters = min(num_samples, max(2, num_samples // 2)) if num_samples >= 3 else 1
+            hdbscan_model = KMeans(n_clusters=n_clusters, n_init="auto", random_state=42)
+            min_topic_size = 1
+        else:
+            # Prevent UMAP n_neighbors and n_components from exceeding sample size
+            n_neighbors = min(5, max(2, num_samples - 1))
+            n_components = min(5, max(1, num_samples - 2)) if num_samples > 3 else 1
+            init_mode = "random" if num_samples < 15 else "spectral"
 
-        # Set safe defaults for HDBSCAN (prediction_data=True is required for .transform())
-        hdbscan_kwargs = dict(
-            min_samples=min(1, max(1, num_samples - 1)),
-            prediction_data=True,
-            **self.config.hdbscan_kwargs,
-        )
+            # Safe defaults for UMAP
+            umap_kwargs = dict(
+                n_neighbors=n_neighbors,
+                n_components=n_components,
+                init=init_mode,
+                min_dist=0.0,
+                metric="cosine",
+                **self.config.umap_kwargs,
+            )
 
-        umap_model = UMAP(**umap_kwargs)
-        hdbscan_model = HDBSCAN(**hdbscan_kwargs)
+            # Set safe defaults for HDBSCAN (prediction_data=True is required for .transform())
+            hdbscan_kwargs = dict(
+                min_samples=min(1, max(1, num_samples - 1)),
+                prediction_data=True,
+                **self.config.hdbscan_kwargs,
+            )
+
+            umap_model = UMAP(**umap_kwargs)
+            hdbscan_model = HDBSCAN(**hdbscan_kwargs)
+            min_topic_size = self.config.min_topic_size
 
         seed_topics = self.config.seed_topics if self.config.seed_topics else None
         seed_words = self.config.seed_words
@@ -205,13 +216,22 @@ class BERTopicFitter:
         else:
             ctfidf_model = None
 
+        representation_model = None
+        if getattr(self.config, "use_keybert", True):
+            try:
+                from bertopic.representation import KeyBERTInspired
+                representation_model = KeyBERTInspired()
+            except Exception:
+                representation_model = None
+
         self.topic_model = BERTopic(
             embedding_model=embedding_model,
-            min_topic_size=self.config.min_topic_size,
+            min_topic_size=min_topic_size,
             seed_topic_list=seed_topics,
             ctfidf_model=ctfidf_model,
             umap_model=umap_model,
             hdbscan_model=hdbscan_model,
+            representation_model=representation_model,
         )
 
         labels, topic_probs = self.topic_model.fit_transform(

@@ -94,9 +94,16 @@ class BERTopicAnalyzer(Analyzer):
             raise RuntimeError("Must call fit() before transform()")
 
         topics, probs = self._fitter.topic_model.transform(texts.tolist())
+        if probs is not None and getattr(probs, "ndim", 0) > 1:
+            topic_prob = probs.max(axis=1)
+        elif probs is not None:
+            topic_prob = probs
+        else:
+            topic_prob = [1.0 if t != -1 else 0.0 for t in topics]
+
         return pd.DataFrame({
             "topic": topics,
-            "topic_probability": probs.max(axis=1) if probs.ndim > 1 else 0.0,
+            "topic_probability": topic_prob,
         })
 
     @property

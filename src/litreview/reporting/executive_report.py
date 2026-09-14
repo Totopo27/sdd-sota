@@ -12,6 +12,63 @@ from typing import Any
 import pandas as pd
 
 
+def generate_topic_mermaid(topics_data: dict[str, Any]) -> str:
+    """Generate a GitHub-compatible Mermaid flowchart from BERTopic / KeyBERT clusters."""
+    if not topics_data or topics_data.get("num_topics", 0) == 0:
+        return ""
+
+    topic_sizes = topics_data.get("topic_sizes", {})
+    top_words = topics_data.get("top_words", {})
+    topic_papers = topics_data.get("topic_papers", {})
+
+    # Extract valid topic IDs excluding -1 (outliers)
+    topic_ids = [tid for tid in topic_sizes.keys() if tid != -1 and str(tid) != "-1"]
+    if not topic_ids:
+        topic_ids = [tid for tid in top_words.keys() if str(tid) != "-1"]
+    if not topic_ids:
+        return ""
+
+    lines = ["```mermaid", "graph TD"]
+    lines.append("    classDef topicNode fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;")
+    lines.append("    classDef paperNode fill:#0f172a,stroke:#64748b,stroke-width:1px,color:#e2e8f0;")
+    lines.append("    classDef outlierNode fill:#334155,stroke:#ef4444,stroke-width:1px,color:#f8fafc;")
+    lines.append("")
+    lines.append('    subgraph SOTA_Clusters ["Semantic Topic Clusters (BERTopic + KeyBERT)"]')
+
+    for tid in topic_ids:
+        size = topic_sizes.get(tid, topic_sizes.get(str(tid), 0))
+        raw_words = top_words.get(str(tid), top_words.get(tid, []))
+        kw_list = []
+        for item in raw_words[:4]:
+            if isinstance(item, (list, tuple)) and len(item) > 0:
+                kw_list.append(str(item[0]))
+            elif isinstance(item, str):
+                kw_list.append(item)
+        kws_str = ", ".join(kw_list) if kw_list else "general"
+        safe_kws = kws_str.replace('"', "'")
+        size_label = f"({size} papers)" if size != 1 else "(1 paper)"
+        tid_int = int(tid) if str(tid).lstrip("-").isdigit() else 0
+        lines.append(f'        T{tid_int}["Topic {tid_int}: {safe_kws}<br/>{size_label}"]:::topicNode')
+
+    lines.append("    end")
+    lines.append("")
+
+    # Add edges to papers
+    paper_idx = 0
+    for tid in topic_ids:
+        tid_int = int(tid) if str(tid).lstrip("-").isdigit() else 0
+        papers = topic_papers.get(tid, topic_papers.get(str(tid), []))
+        for p in papers[:4]:
+            p_clean = str(p).replace('"', "'").strip()
+            if len(p_clean) > 42:
+                p_clean = p_clean[:39] + "..."
+            lines.append(f'    T{tid_int} --> P{paper_idx}["{p_clean}"]:::paperNode')
+            paper_idx += 1
+
+    lines.append("```")
+    return "\n".join(lines)
+
+
 def generate_executive_markdown(
     summary_data: dict[str, Any],
     scored_df: pd.DataFrame | None = None,
@@ -184,6 +241,33 @@ def generate_executive_markdown(
             shared_str = ", ".join(f"*{r}*" for r in shared_refs[:2])
             lines.append(f"- **{p1}** ↔ **{p2}** ({sh_count} shared references: {shared_str})")
         lines.append("")
+
+    # --- Semantic Topic Topology (BERTopic + KeyBERT) ---
+    topics_info = summary_data.get("topics", {})
+    if topics_info and topics_info.get("num_topics", 0) > 0:
+        lines.append("## 🗺️ Semantic Topic Topology & Clusters (BERTopic + KeyBERT)")
+        lines.append("Latent thematic clusters discovered via unsupervised semantic representations:")
+        lines.append("")
+        mermaid_block = generate_topic_mermaid(topics_info)
+        if mermaid_block:
+            lines.append(mermaid_block)
+            lines.append("")
+
+        top_words = topics_info.get("top_words", {})
+        topic_sizes = topics_info.get("topic_sizes", {})
+        topic_papers = topics_info.get("topic_papers", {})
+        if top_words:
+            lines.append("| Topic | Size | KeyBERT Semantic Descriptors | Exemplar Papers |")
+            lines.append("| :---: | :---: | :--- | :--- |")
+            for tid, words in sorted(top_words.items(), key=lambda x: str(x[0])):
+                if str(tid) == "-1":
+                    continue
+                size = topic_sizes.get(tid, topic_sizes.get(int(tid) if str(tid).isdigit() else 0, 0))
+                kw_str = ", ".join(f"`{w[0] if isinstance(w, (list, tuple)) else w}`" for w in words[:5])
+                papers = topic_papers.get(tid, topic_papers.get(int(tid) if str(tid).isdigit() else 0, []))
+                ex_str = ", ".join(f"*{p[:45]}...*" if len(p) > 45 else f"*{p}*" for p in papers[:2]) if papers else "—"
+                lines.append(f"| **#{tid}** | {size} | {kw_str} | {ex_str} |")
+            lines.append("")
 
     # --- Taxonomy & Gaps ---
     labels = taxonomy.get("label_counts", {})

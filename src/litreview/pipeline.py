@@ -100,15 +100,14 @@ class ReviewPipeline:
         if (not self.skip_bertopic
                 and self.config.bertopic.compute
                 and len(abstracts) > 0):
-            # BERTopic needs a minimum number of documents to produce
-            # meaningful clusters (UMAP needs n_neighbors >= 2, HDBSCAN
-            # needs at least a few points per cluster).
-            if len(abstracts) < 10:
+            # BERTopic needs at least 2 documents with non-empty abstracts
+            # to form clusters or comparative topics.
+            if len(abstracts) < 2:
                 total_papers = len(df)
                 non_empty = len(abstracts)
                 raise ValueError(
                     f"Only {non_empty} of {total_papers} papers have abstracts. "
-                    "BERTopic requires at least 10 documents with non-empty abstracts. "
+                    "BERTopic requires at least 2 documents with non-empty abstracts. "
                     "Options:\n"
                     "  1. Import abstracts into Zotero (item details → Notes → Abstract)\n"
                     "  2. Use --skip-bertopic to run zero-shot classification only\n"

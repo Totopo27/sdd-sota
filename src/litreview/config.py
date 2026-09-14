@@ -89,6 +89,7 @@ class BERTopicConfig:
     top_n_topics: int = 3
     distribution_window: int = 4
     distribution_stride: int = 2
+    use_keybert: bool = True
 
     @classmethod
     def from_config(cls, cfg: dict) -> "BERTopicConfig":
@@ -108,6 +109,7 @@ class BERTopicConfig:
             top_n_topics=cfg.get("top_n_topics", 3),
             distribution_window=cfg.get("distribution_window", 4),
             distribution_stride=cfg.get("distribution_stride", 2),
+            use_keybert=cfg.get("use_keybert", True),
         )
 
 

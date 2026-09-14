@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 import requests
 from dotenv import load_dotenv
+import pandas as pd
 
 from litreview import ReviewPipeline, load_config
 
@@ -242,6 +243,18 @@ def main():
             print(f"Warning: Plot generation failed: {e}", file=sys.stderr)
 
     # 6. Build structured summary for AI Agent
+    topic_papers_map = {}
+    if report.df is not None and "topic" in report.df.columns and "Title" in report.df.columns:
+        for _, row in report.df.iterrows():
+            t_val = row.get("topic")
+            t_title = str(row.get("Title", "")).strip()
+            if pd.notna(t_val) and t_title:
+                try:
+                    t_key = int(t_val)
+                except (ValueError, TypeError):
+                    t_key = str(t_val)
+                topic_papers_map.setdefault(t_key, []).append(t_title)
+
     summary_data = {
         "status": "success",
         "corpus": report.corpus_stats,
@@ -250,6 +263,7 @@ def main():
             "outlier_count": report.topic_coverage.get("outlier_count", 0),
             "topic_sizes": report.topic_coverage.get("topic_sizes", {}),
             "top_words": report.bertopic_results.get("topic_words", {}),
+            "topic_papers": topic_papers_map,
         },
         "taxonomy_validation": {
             "total_classified": report.topic_coverage.get("total_classified", 0),
