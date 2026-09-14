@@ -164,6 +164,17 @@ def main():
         default="results/sdd-research-report.md",
         help="Path for executive Markdown research briefing export",
     )
+    parser.add_argument(
+        "--change",
+        default=None,
+        help="SDD change name/slug (e.g. 'agentic-se-architectures') to persist research artifacts",
+    )
+    parser.add_argument(
+        "--artifact-store",
+        default="auto",
+        choices=["auto", "openspec", "engram", "hybrid", "none"],
+        help="Target persistence backend for SDD research artifacts (default: 'auto')",
+    )
     args = parser.parse_args()
 
 
@@ -368,12 +379,32 @@ def main():
         except Exception as me:
             logger.warning(f"Failed to generate executive markdown report: {me}")
 
-    # 9. Write output JSON
+    # 9. Persist to SDD Lifecycle (OpenSpec / Engram)
+    if args.change:
+        try:
+            from litreview.reporting.executive_report import generate_executive_markdown
+            from litreview.reporting.persistence import persist_research_artifacts
+
+            scored_df = report.df if report is not None else None
+            md_content = generate_executive_markdown(summary_data, scored_df=scored_df)
+            receipt = persist_research_artifacts(
+                change_name=args.change,
+                markdown_content=md_content,
+                summary_data=summary_data,
+                mode=args.artifact_store,
+            )
+            summary_data["persistence"] = receipt
+            print(f"Persisted research artifacts for change '{args.change}' (mode: {receipt['mode']})", file=sys.stderr)
+        except Exception as pe:
+            logger.warning(f"Failed to persist research artifacts for change '{args.change}': {pe}")
+            summary_data["persistence"] = {"status": "failed", "error": str(pe)}
+
+    # 10. Write output JSON
     os.makedirs(os.path.dirname(args.output_json) or ".", exist_ok=True)
     with open(args.output_json, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2, default=str)
 
-    # 10. Print JSON summary to stdout
+    # 11. Print JSON summary to stdout
     print(json.dumps(summary_data, indent=2, default=str))
 
 

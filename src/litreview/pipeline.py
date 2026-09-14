@@ -269,12 +269,38 @@ class Report:
         path: str,
         citation_summary: dict | None = None,
         rubric_summary: dict | None = None,
+        change_name: str | None = None,
+        artifact_store: str = "auto",
+        workspace_root: str = ".",
     ) -> str:
-        """Export comprehensive executive markdown research briefing to disk."""
-        from litreview.reporting.executive_report import export_markdown_report
+        """Export comprehensive executive markdown research briefing to disk.
+
+        Optionally persists artifacts to OpenSpec / Engram if change_name is supplied.
+        """
+        from litreview.reporting.executive_report import export_markdown_report, generate_executive_markdown
+        from litreview.reporting.persistence import persist_research_artifacts
+
+        topic_papers_map = {}
+        if self.df is not None and "topic" in self.df.columns and "Title" in self.df.columns:
+            for _, row in self.df.iterrows():
+                t_val = row.get("topic")
+                t_title = str(row.get("Title", "")).strip()
+                if pd.notna(t_val) and t_title:
+                    try:
+                        t_key = int(t_val)
+                    except (ValueError, TypeError):
+                        t_key = str(t_val)
+                    topic_papers_map.setdefault(t_key, []).append(t_title)
 
         summary_data = {
             "corpus": self.corpus_stats,
+            "topics": {
+                "num_topics": self.topic_coverage.get("num_topics", 0),
+                "outlier_count": self.topic_coverage.get("outlier_count", 0),
+                "topic_sizes": self.topic_coverage.get("topic_sizes", {}),
+                "top_words": self.bertopic_results.get("topic_words", {}),
+                "topic_papers": topic_papers_map,
+            },
             "topic_coverage": self.topic_coverage,
             "gap_analysis": self.gap_analysis,
             "cross_analysis": self.cross_analysis,
@@ -293,7 +319,19 @@ class Report:
                 "oa_ratio": round(oa_count / total_p, 4) if total_p > 0 else 0.0,
             }
 
-        return export_markdown_report(path, summary_data, scored_df=self.df)
+        saved_path = export_markdown_report(path, summary_data, scored_df=self.df)
+
+        if change_name:
+            md_content = generate_executive_markdown(summary_data, scored_df=self.df)
+            persist_research_artifacts(
+                change_name=change_name,
+                markdown_content=md_content,
+                summary_data=summary_data,
+                mode=artifact_store,
+                workspace_root=workspace_root,
+            )
+
+        return saved_path
 
 
     def generate_plots(self, path: str) -> None:
