@@ -19,9 +19,16 @@ logger = logging.getLogger(__name__)
 # Canonical academic section headers with regex matching rules
 SECTION_HEADER_PATTERNS = [
     (
+        "other",
+        re.compile(
+            r"^(?:\d+[\.\)]?\s*)?(?:ccs\s+concepts|keywords|index\s+terms|acm\s+reference\s+format)$",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "limitations",
         re.compile(
-            r"^(?:\d+[\.\)]?\s*)?(?:limitations?(?:\s+and\s+(?:ethical\s+considerations?|broader\s+impacts?|future\s+work))?|failure\s+modes?|threats\s+to\s+validity|ethical\s+considerations?|broader\s+impacts?)$",
+            r"^(?:\d+[\.\)]?\s*)?(?:limitations?(?:\s+and\s+(?:ethical\s+considerations?|broader\s+impacts?|future\s+work))?|failure\s+modes?|threats\s+to\s+(?:[\w\s]+\s+)?validity|ethical\s+considerations?|broader\s+impacts?)$",
             re.IGNORECASE,
         ),
     ),
@@ -42,28 +49,21 @@ SECTION_HEADER_PATTERNS = [
     (
         "experiments",
         re.compile(
-            r"^(?:\d+[\.\)]?\s*)?(?:experiments?(?:\s+and\s+results)?|experimental\s+(?:results|setup|evaluation)|evaluation(?:\s+and\s+results)?|benchmarks?|results(?:\s+and\s+discussion)?)$",
+            r"^(?:\d+[\.\)]?\s*)?(?:experiments?(?:\s+and\s+results)?|experiment(?:al)?\s+(?:results|setup|evaluation)|evaluation(?:\s+and\s+results)?|benchmarks?|results(?:\s+and\s+discussion)?)$",
             re.IGNORECASE,
         ),
     ),
     (
         "methodology",
         re.compile(
-            r"^(?:\d+[\.\)]?\s*)?(?:methodology|methods?|proposed\s+(?:method|approach|framework|architecture|model)|system\s+architecture|architecture)$",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "introduction",
-        re.compile(
-            r"^(?:\d+[\.\)]?\s*)?(?:introduction|background)$",
+            r"^(?:\d+[\.\)]?\s*)?(?:methodology|methods?|proposed\s+(?:method|approach|framework|architecture|model)|(?:[A-Z][a-zA-Z\s]{1,30}\s+)?(?:framework|architecture|approach)|motivating\s+example)$",
             re.IGNORECASE,
         ),
     ),
     (
         "conclusion",
         re.compile(
-            r"^(?:\d+[\.\)]?\s*)?(?:conclusions?(?:\s+and\s+future\s+work)?|concluding\s+remarks|summary|discussion)$",
+            r"^(?:\d+[\.\)]?\s*)?(?:conclusions?(?:\s+and\s+future\s+work)?|concluding\s+remarks|summary|discussion|perspectives)$",
             re.IGNORECASE,
         ),
     ),
@@ -75,6 +75,13 @@ SECTION_HEADER_PATTERNS = [
         ),
     ),
     (
+        "introduction",
+        re.compile(
+            r"^(?:1(?:\.0)?\s+[A-Z][\w\s]+|(?:\d+[\.\)]?\s*)?(?:introduction|background|related\s+(?:work|literature)|relevant\s+literature))$",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "abstract",
         re.compile(
             r"^(?:\d+[\.\)]?\s*)?abstract$",
@@ -82,6 +89,8 @@ SECTION_HEADER_PATTERNS = [
         ),
     ),
 ]
+
+
 
 
 def clean_academic_text(text: str) -> str:

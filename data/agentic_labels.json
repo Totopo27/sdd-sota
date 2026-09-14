@@ -1,0 +1,6 @@
+{
+  "AGENT": "software engineering agents and autonomous workflows",
+  "EVAL": "benchmarks evaluation pass rate and empirical experiments",
+  "REPAIR": "automated program repair fault localization and bug fixing",
+  "REPRO": "open source code reproduction and artifact availability"
+}

@@ -16,8 +16,10 @@ import os
 import sys
 from pathlib import Path
 import requests
+from dotenv import load_dotenv
 
 from litreview import ReviewPipeline, load_config
+
 from litreview.fetchers.csv_fetcher import CSVFetcher
 from litreview.fetchers.parquet_fetcher import ParquetFetcher
 
@@ -87,8 +89,9 @@ def resolve_and_parse_pdfs(
 
 
 def main():
-
+    load_dotenv()
     parser = argparse.ArgumentParser(
+
         description="Run literature review pipeline and generate SDD-ready JSON summary"
     )
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")

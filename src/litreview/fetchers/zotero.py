@@ -92,22 +92,26 @@ class ZoteroFetcher(Fetcher):
                 if match:
                     year = int(match.group())
 
-            # Extract DOI from extra fields (e.g.  doi = 10.xxxx/xxxx)
-            doi = None
+            # Extract DOI directly from item data or extra field
+            doi = data.get("DOI") or None
             extra = data.get("extra", "")
-            if extra:
-                doi_match = re.search(r"doi\s*=\s*(10\.\S+)", extra, re.IGNORECASE)
+            if not doi and extra:
+                doi_match = re.search(r"doi\s*[:=]\s*(10\.\S+)", extra, re.IGNORECASE)
                 if doi_match:
                     doi = doi_match.group(1)
+
+            url = data.get("url", "")
 
             processed_data.append({
                 "Title": data.get("title", ""),
                 "Abstract Note": data.get("abstractNote", ""),
                 "Publication Year": year,
                 "DOI": doi,
+                "Url": url,
                 "Source": "Zotero",
                 "Item Type": item_type,
             })
+
 
         df = pd.DataFrame(processed_data)
         if not df.empty:
