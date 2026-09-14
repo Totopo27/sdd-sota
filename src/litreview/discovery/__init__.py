@@ -8,6 +8,11 @@ from litreview.discovery.dedup import (
     normalize_title,
     title_token_similarity,
 )
+from litreview.discovery.pdf_parser import (
+    PDFSectionParser,
+    clean_academic_text,
+    segment_academic_sections,
+)
 
 __all__ = [
     "OpenAlexClient",
@@ -18,4 +23,8 @@ __all__ = [
     "PaperDeduplicator",
     "normalize_title",
     "title_token_similarity",
+    "PDFSectionParser",
+    "clean_academic_text",
+    "segment_academic_sections",
 ]
+

@@ -11,16 +11,83 @@ Usage:
 
 import argparse
 import json
+import logging
 import os
 import sys
 from pathlib import Path
+import requests
 
 from litreview import ReviewPipeline, load_config
 from litreview.fetchers.csv_fetcher import CSVFetcher
 from litreview.fetchers.parquet_fetcher import ParquetFetcher
 
+logger = logging.getLogger(__name__)
+
+
+
+def resolve_and_parse_pdfs(
+    df,
+    pdf_dir: str = "data/raw_pdfs",
+) -> dict[str, dict]:
+    """Resolve and extract academic sections from local or OA PDFs for papers in DataFrame."""
+    if df is None or len(df) == 0:
+        return {}
+
+    os.makedirs(pdf_dir, exist_ok=True)
+    from litreview.discovery.pdf_parser import PDFSectionParser
+
+    parser = PDFSectionParser()
+
+    parsed_sections = {}
+
+    for _, row in df.iterrows():
+        doi = str(row.get("DOI") or "").strip()
+        title = str(row.get("Title") or "").strip()
+        oa_url = str(row.get("oa_url") or "").strip()
+        url = str(row.get("Url") or "").strip()
+
+        # Sanitize filename for local cache
+        safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in (doi or title))[:80]
+        local_pdf_path = os.path.join(pdf_dir, f"{safe_name}.pdf")
+
+        pdf_bytes = None
+        if os.path.exists(local_pdf_path):
+            try:
+                with open(local_pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+            except Exception as e:
+                logger.warning(f"Failed to read local PDF {local_pdf_path}: {e}")
+
+        # If not cached locally and OA URL is available, attempt download
+        if pdf_bytes is None and (oa_url or (url and url.lower().endswith(".pdf"))):
+            fetch_url = oa_url or url
+            try:
+                resp = requests.get(fetch_url, timeout=15, headers={"User-Agent": "SDD-SOTA-LitReview/1.0"})
+                if resp.status_code == 200 and resp.content.startswith(b"%PDF"):
+                    pdf_bytes = resp.content
+                    try:
+                        with open(local_pdf_path, "wb") as f:
+                            f.write(pdf_bytes)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(f"Could not download PDF from {fetch_url}: {e}")
+
+        if pdf_bytes:
+            try:
+                sections = parser.parse_pdf(pdf_bytes)
+                if doi:
+                    parsed_sections[doi] = sections
+                if title:
+                    parsed_sections[title] = sections
+            except Exception as e:
+                logger.warning(f"Failed to parse PDF for {doi or title}: {e}")
+
+    return parsed_sections
+
 
 def main():
+
     parser = argparse.ArgumentParser(
         description="Run literature review pipeline and generate SDD-ready JSON summary"
     )
@@ -78,7 +145,18 @@ def main():
         action="store_true",
         help="Disable automatic cross-source deduplication with year-slack",
     )
+    parser.add_argument(
+        "--parse-pdfs",
+        action="store_true",
+        help="Download/parse full-text academic PDFs for section-targeted NeurIPS rigor evaluation",
+    )
+    parser.add_argument(
+        "--pdf-dir",
+        default="data/raw_pdfs",
+        help="Local directory to cache or read full-text PDFs",
+    )
     args = parser.parse_args()
+
 
     # 1. Load config
     if not os.path.exists(args.config):
@@ -204,7 +282,7 @@ def main():
                     if title_key:
                         topical_map[title_key] = float(row.get("score", 0.5))
 
-            # Run NeurIPS Rigor Rubric Analyzer on corpus abstracts
+            # Run NeurIPS Rigor Rubric Analyzer on corpus abstracts or full-text sections
             methodology_map = {}
             rubric_summary = {}
             try:
@@ -213,14 +291,33 @@ def main():
                 abstracts = report.df["Abstract Note"].dropna()
                 if len(abstracts) > 0:
                     rubric_analyzer.fit(abstracts)
-                    rubric_df = rubric_analyzer.transform(abstracts)
+                    parsed_sections = {}
+                    if getattr(args, "parse_pdfs", False):
+                        parsed_sections = resolve_and_parse_pdfs(
+                            report.df,
+                            pdf_dir=args.pdf_dir,
+                        )
+                    rubric_df = rubric_analyzer.transform_sections(
+                        report.df,
+                        parsed_sections=parsed_sections,
+                    )
                     rubric_summary = rubric_analyzer.results
                     for idx, row in rubric_df.iterrows():
                         paper_title = str(report.df.loc[idx, "Title"]).strip()
                         if paper_title:
                             methodology_map[paper_title] = float(row.get("rubric_score", 0.5))
+
+                    # Enrich report.df with rubric scores and re-export if paths configured
+                    for col in rubric_df.columns:
+                        if col not in report.df.columns:
+                            report.df[col] = rubric_df[col]
+                    if args.output_csv:
+                        report.export_csv(args.output_csv)
+                    if args.output_parquet:
+                        report.export_parquet(args.output_parquet)
             except Exception as re:
                 logger.warning(f"NeurIPS rubric evaluation skipped/failed: {re}")
+
 
             summary_data["citation_network"] = graph_builder.summary(
                 topical_relevance_map=topical_map,
